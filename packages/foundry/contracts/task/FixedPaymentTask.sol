@@ -14,7 +14,8 @@ contract FixedPaymentTask is BaseTask {
     // 存储任务的工作者地址（一对一任务）
     mapping(uint256 => address) public taskWorker;
 
-    uint256 minTimeBeforeDispute = 3 days;
+    // 存储任务的工作量证明
+    mapping(uint256 => mapping(address => ProofOfWork)) public taskWorkProofs;
 
     // 自定义错误
     error FixedPaymentTask_OnlyWorkerCanSubmitProof();
@@ -30,6 +31,7 @@ contract FixedPaymentTask is BaseTask {
     error FixedPaymentTask_TaskNotOpen(uint256 taskId);
     error FixedPaymentTask_NoProofOfWorkSubmitted();
     error FixedPaymentTask_ProofAlreadyApproved();
+    error FixedPaymentTask_DisputeTimeNotReached();
 
     // 自定义事件
     event FixedPaymentTask_TaskWorkerAdded(
@@ -177,6 +179,48 @@ contract FixedPaymentTask is BaseTask {
     }
 
     /**
+     * @notice 终止任务，直接取消任务
+     * @param _taskId 任务ID
+     */
+    function terminateTask(
+        uint256 _taskId
+    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+        Task storage task = tasks[_taskId];
+
+        // 检查任务状态是否允许终止
+        if (
+            task.status != TaskStatus.Open &&
+            task.status != TaskStatus.InProgress
+        ) {
+            revert FixedPaymentTask_TaskCannotBeCancelled();
+        }
+
+        // 获取当前分配的工作者
+        address worker = taskWorker[_taskId];
+
+        // 检查是否有工作量证明提交，如果有则可以提交纠纷
+        ProofOfWork storage proof = taskWorkProofs[_taskId][worker];
+        if (worker != address(0) && proof.submitted && !proof.approved) {
+            // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
+            // 资金将在纠纷解决时分配，这里不需要进行补偿
+            submitDispute(
+                _taskId,
+                worker,
+                task.creator,
+                task.totalreward,
+                proof.proof
+            );
+        } else if (task.totalreward > 0) {
+            taskToken.safeTransfer(task.creator, task.totalreward);
+            task.totalreward = 0;
+        }
+
+        // 清理任务工作者并更新状态
+        task.status = TaskStatus.Cancelled;
+        emit FixedPaymentTask_TaskCancelled(_taskId);
+    }
+
+    /**
      * @notice 提交工作量证明
      * @param _taskId 任务ID
      * @param _proof 工作量证明内容
@@ -184,19 +228,18 @@ contract FixedPaymentTask is BaseTask {
     function submitProofOfWork(
         uint256 _taskId,
         string memory _proof
-    )
-        public
-        override
-        whenNotPaused
-        onlyTaskWorker(_taskId)
-        onlyTaskInProgress(_taskId)
-    {
+    ) public whenNotPaused onlyTaskWorker(_taskId) onlyTaskInProgress(_taskId) {
         Task storage task = tasks[_taskId];
         if (block.timestamp >= task.deadline) {
             revert FixedPaymentTask_TaskDeadlinePassed();
         }
         if (bytes(_proof).length == 0) {
             revert FixedPaymentTask_ProofOfWorkEmpty();
+        }
+
+        // 检查工作量证明是否已经批准
+        if (taskWorkProofs[_taskId][msg.sender].approved) {
+            revert FixedPaymentTask_ProofAlreadyApproved();
         }
 
         taskWorkProofs[_taskId][msg.sender] = ProofOfWork({
@@ -214,12 +257,11 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      */
-    function requireMeetsTaskRequirements(
+    function approveProofOfWork(
         uint256 _taskId,
         address _worker
     )
         public
-        override
         onlyTaskCreator(_taskId)
         whenNotPaused
         onlyTaskInProgress(_taskId)
@@ -239,18 +281,12 @@ contract FixedPaymentTask is BaseTask {
     }
 
     /**
-     * @notice 标记任务为完成,由于这是一次结算的任务，所以完成的逻辑放到验证工作量函数中了
-     * @param _taskId 任务ID
-     */
-    function completeTask(uint256 _taskId) public override {}
-
-    /**
      * @notice 支付任务奖励
      * @param _taskId 任务ID
      */
     function payTask(
         uint256 _taskId
-    ) public override onlyTaskWorker(_taskId) whenNotPaused {
+    ) public onlyTaskWorker(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否可以支付
@@ -273,89 +309,6 @@ contract FixedPaymentTask is BaseTask {
         task.status = TaskStatus.Paid;
 
         emit FixedPaymentTask_TaskPaid(_taskId, payment, fee);
-    }
-
-    /**
-     * @notice 从任务中移除工作者
-     * @param _taskId 任务ID
-     * @param _worker 工作者地址
-     */
-    function removeWorker(
-        uint256 _taskId,
-        address _worker
-    )
-        public
-        override
-        onlyTaskCreator(_taskId)
-        onlyTaskWorkerAddress(_taskId, _worker)
-        whenNotPaused
-    {
-        Task storage task = tasks[_taskId];
-
-        // 检查是否有工作量证明提交，如果有则可以提交纠纷
-        ProofOfWork storage proof = taskWorkProofs[_taskId][_worker];
-        if (proof.submitted) {
-            // 如果工作者已经提交了工作量证明，则允许提交纠纷进行评判
-            submitDispute(
-                _taskId,
-                _worker,
-                task.creator,
-                task.totalreward,
-                proof.proof
-            );
-        }
-
-        delete taskWorker[_taskId];
-        task.status = TaskStatus.Open;
-
-        emit FixedPaymentTask_TaskWorkerRemoved(_taskId, _worker);
-    }
-
-    /**
-     * @notice 取消任务
-     * @param _taskId 任务ID
-     */
-    function cancelTask(
-        uint256 _taskId
-    ) public override onlyTaskCreator(_taskId) {
-        Task storage task = tasks[_taskId];
-
-        if (
-            task.status != TaskStatus.Open &&
-            task.status != TaskStatus.InProgress
-        ) {
-            revert FixedPaymentTask_TaskCannotBeCancelled();
-        }
-
-        // 检查是否有工作者以及工作量证明，如果有则可以提交纠纷
-        address worker = taskWorker[_taskId];
-        ProofOfWork storage proof = taskWorkProofs[_taskId][worker];
-        if (worker != address(0)) {
-            if (proof.submitted) {
-                // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
-                // 资金将在纠纷解决时分配，这里不需要进行补偿
-                submitDispute(
-                    _taskId,
-                    worker,
-                    task.creator,
-                    task.totalreward,
-                    proof.proof
-                );
-
-                // 提交纠纷后，直接将任务标记为取消，不进行其他资金操作
-                task.status = TaskStatus.Cancelled;
-                emit FixedPaymentTask_TaskCancelled(_taskId);
-                return;
-            }
-        }
-
-        // 在没有工作者或者工作者没有提交工作证明的情况下，资金直接退还给任务创建者
-        if (worker == address(0) || !proof.submitted) {
-            taskToken.safeTransfer(task.creator, task.totalreward);
-        }
-
-        task.status = TaskStatus.Cancelled;
-        emit FixedPaymentTask_TaskCancelled(_taskId);
     }
 
     /**
@@ -385,7 +338,7 @@ contract FixedPaymentTask is BaseTask {
         // 这给任务创建者一些时间来批准工作证明
 
         if (block.timestamp < proof.submittedAt + minTimeBeforeDispute) {
-            revert FixedPaymentTask_TaskNotCompleted();
+            revert FixedPaymentTask_DisputeTimeNotReached();
         }
 
         // 提交纠纷
@@ -398,40 +351,5 @@ contract FixedPaymentTask is BaseTask {
         );
 
         emit FixedPaymentTask_DisputeFiledByWorker(_taskId, msg.sender);
-    }
-
-    /**
-     * @notice 实现基础任务合约中的提交纠纷抽象函数
-     * @param _taskId 任务ID
-     * @param _worker 工作者地址
-     * @param _taskCreator 任务创建者地址
-     * @param _rewardAmount 奖励金额
-     * @param _proofOfWork 工作量证明内容
-     */
-    function submitDispute(
-        uint256 _taskId,
-        address _worker,
-        address _taskCreator,
-        uint256 _rewardAmount,
-        string memory _proofOfWork
-    ) internal override {
-        // 批准纠纷解决合约转移所需的资金
-        taskToken.safeIncreaseAllowance(
-            address(disputeResolver),
-            _rewardAmount
-        );
-
-        // 调用纠纷解决合约的fileDispute函数
-        // 资金将从当前合约转移到纠纷解决合约中
-        disputeResolver.fileDispute(
-            address(this), // 任务合约地址
-            _taskId, // 任务ID
-            _worker, // 工作者地址
-            _taskCreator, // 任务创建者地址
-            _rewardAmount, // 奖励金额
-            _proofOfWork // 工作量证明内容
-        );
-
-        tasks[_taskId].totalreward = 0;
     }
 }

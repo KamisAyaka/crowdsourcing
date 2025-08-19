@@ -58,6 +58,9 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     // 平台费用 (以基点计算，100 = 1%)
     uint256 public platformFee = 100; // 1%
 
+    // 用户提交证明后最快申请纠纷的时间
+    uint256 minTimeBeforeDispute = 3 days;
+
     // 任务计数器
     uint256 public taskCounter;
 
@@ -72,9 +75,6 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
 
     // 存储所有任务
     mapping(uint256 => Task) public tasks;
-
-    // 存储任务的工作量证明
-    mapping(uint256 => mapping(address => ProofOfWork)) public taskWorkProofs;
 
     // 事件定义
     event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
@@ -117,32 +117,10 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     ) public virtual;
 
     /**
-     * @notice 抽象函数，由子合约实现具体的提交工作证明逻辑
-     * @param _taskId 任务ID
-     * @param _proof 工作量证明内容
-     */
-    function submitProofOfWork(
-        uint256 _taskId,
-        string memory _proof
-    ) public virtual {}
-
-    /**
-     * @notice 抽象函数，由子合约实现具体的任务完成逻辑
+     * @notice 抽象函数，由子合约实现具体的任务终止逻辑
      * @param _taskId 任务ID
      */
-    function completeTask(uint256 _taskId) public virtual;
-
-    /**
-     * @notice 抽象函数，由子合约实现具体的支付逻辑
-     * @param _taskId 任务ID
-     */
-    function payTask(uint256 _taskId) public virtual;
-
-    /**
-     * @notice 抽象函数，由子合约实现具体的任务取消逻辑
-     * @param _taskId 任务ID
-     */
-    function cancelTask(uint256 _taskId) public virtual;
+    function terminateTask(uint256 _taskId) public virtual;
 
     /**
      * @notice 抽象函数，由子合约实现具体的添加工作者逻辑
@@ -154,13 +132,6 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         address _worker,
         uint256 _reward
     ) public virtual;
-
-    /**
-     * @notice 抽象函数，由子合约实现具体的移除工作者逻辑
-     * @param _taskId 任务ID
-     * @param _worker 工作者地址
-     */
-    function removeWorker(uint256 _taskId, address _worker) public virtual;
 
     /**
      * @notice 抽象函数，由子合约实现具体的纠纷提交逻辑
@@ -176,17 +147,26 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         address _taskCreator,
         uint256 _rewardAmount,
         string memory _proofOfWork
-    ) internal virtual;
+    ) internal {
+        // 批准纠纷解决合约转移所需的资金
+        taskToken.safeIncreaseAllowance(
+            address(disputeResolver),
+            _rewardAmount
+        );
 
-    /**
-     * @notice 抽象函数，由子合约实现，检查工作者是否符合特定任务类型的要求
-     * @param _taskId 任务ID
-     * @param _worker 工作者地址
-     */
-    function requireMeetsTaskRequirements(
-        uint256 _taskId,
-        address _worker
-    ) public virtual;
+        // 调用纠纷解决合约的fileDispute函数
+        // 资金将从当前合约转移到纠纷解决合约中
+        disputeResolver.fileDispute(
+            address(this), // 任务合约地址
+            _taskId, // 任务ID
+            _worker, // 工作者地址
+            _taskCreator, // 任务创建者地址
+            _rewardAmount, // 奖励金额
+            _proofOfWork // 工作量证明内容
+        );
+
+        tasks[_taskId].totalreward -= _rewardAmount;
+    }
 
     /**
      * @notice 更新平台费用
