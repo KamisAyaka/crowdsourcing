@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -54,17 +54,17 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     }
 
     // 平台代币地址
-    IERC20 public taskToken;
+    IERC20 public immutable taskToken;
 
     // 纠纷计数器
     uint256 public disputeCounter;
 
     // 管理员质押金额
-    uint256 public adminStakeAmount = 1000 * 10 ** 18; // 默认1000个代币
+    uint256 public constant adminStakeAmount = 1000 * 10 ** 18; // 默认1000个代币
 
     // 纠纷处理奖励比例 (以基点表示，100基点=1%)
-    uint256 public disputeProcessingRewardBps = 50; // 默认0.5%
-
+    uint256 public constant disputeProcessingRewardBps = 50; // 默认0.5%
+    uint256 public constant DenominatorFee = 1e4;
     // 存储所有纠纷
     mapping(uint256 => Dispute) public disputes;
 
@@ -94,6 +94,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     error DisputeResolver_AlreadyVoted();
     error DisputeResolver_VotesAlreadyProcessed();
     error DisputeResolver_NotEnoughVotes();
+    error DisputeResolver_InvalidTaskToken();
 
     // 事件定义
     event DisputeResolver_DisputeFiled(
@@ -150,13 +151,16 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @param _taskToken 平台代币地址
      */
     constructor(IERC20 _taskToken) Ownable(msg.sender) {
+        if (address(_taskToken) == address(0)) {
+            revert DisputeResolver_InvalidTaskToken();
+        }
         taskToken = _taskToken;
     }
 
     /**
      * @notice 管理员质押代币成为管理员
      */
-    function stakeToBecomeAdmin() public {
+    function stakeToBecomeAdmin() external {
         // 检查是否已经质押
         if (adminStakes[msg.sender] > 0) {
             revert DisputeResolver_AlreadyStaked();
@@ -173,7 +177,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     /**
      * @notice 管理员提取质押金（需要先取消管理员资格）
      */
-    function withdrawStake() public nonReentrant {
+    function withdrawStake() external nonReentrant {
         // 检查是否是管理员
         if (adminStakes[msg.sender] == 0) {
             revert DisputeResolver_NotAdmin();
@@ -204,7 +208,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         address _taskCreator,
         uint256 _rewardAmount,
         string memory _proofOfWork
-    ) public nonReentrant {
+    ) external nonReentrant {
         // 检查任务合约地址是否有效
         if (_taskContract == address(0)) {
             revert DisputeResolver_InvalidTaskContract();
@@ -250,7 +254,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     function voteOnDispute(
         uint256 _disputeId,
         uint256 _workerShare
-    ) public nonReentrant onlyActiveDispute(_disputeId) {
+    ) external nonReentrant onlyActiveDispute(_disputeId) {
         // 检查是否是激活的管理员
         if (adminStatus[msg.sender] != AdminStatus.Active) {
             revert DisputeResolver_NotAdmin();
@@ -290,7 +294,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      */
     function processVotes(
         uint256 _disputeId
-    ) public nonReentrant onlyActiveDispute(_disputeId) {
+    ) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
 
         // 检查纠纷状态
@@ -312,7 +316,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         // 计算平均值
         uint256 totalWorkerShare = 0;
-        for (uint i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             totalWorkerShare += dispute.votes[i].workerShare;
         }
         uint256 averageWorkerShare = totalWorkerShare / length;
@@ -337,7 +341,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      */
     function approveProposal(
         uint256 _disputeId
-    ) public nonReentrant onlyActiveDispute(_disputeId) {
+    ) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
         DistributionProposal storage proposal = distributionProposals[
             _disputeId
@@ -384,7 +388,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      */
     function distributeFunds(
         uint256 _disputeId
-    ) public nonReentrant onlyActiveDispute(_disputeId) {
+    ) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
         DistributionProposal storage proposal = distributionProposals[
             _disputeId
@@ -402,7 +406,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         // 计算奖励金额
         uint256 processingReward = (dispute.rewardAmount *
-            disputeProcessingRewardBps) / 10000;
+            disputeProcessingRewardBps) / DenominatorFee;
 
         // 计算实际分配给工作者和创建者的金额（扣除奖励）
         uint256 workerAmount = proposal.workerShare;
@@ -444,7 +448,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         // 为参与投票的管理员增加质押资金（奖励）
         if (rewardPerAdmin > 0) {
-            for (uint i = 0; i < length; i++) {
+            for (uint256 i = 0; i < length; i++) {
                 address admin = dispute.votes[i].admin;
                 adminStakes[admin] += rewardPerAdmin;
             }
@@ -464,7 +468,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      */
     function rejectProposal(
         uint256 _disputeId
-    ) public nonReentrant onlyActiveDispute(_disputeId) {
+    ) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
         DistributionProposal storage proposal = distributionProposals[
             _disputeId
@@ -482,7 +486,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         // 计算拒绝费用（与处理奖励相同）
         uint256 processingReward = (dispute.rewardAmount *
-            disputeProcessingRewardBps) / 10000;
+            disputeProcessingRewardBps) / DenominatorFee;
         uint256 length = dispute.votes.length;
 
         // 收取拒绝费用并分配给评判人
@@ -495,7 +499,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
             uint256 rewardPerAdmin = processingReward / length;
 
             // 为参与投票的管理员增加质押资金（拒绝费用）
-            for (uint i = 0; i < length; i++) {
+            for (uint256 i = 0; i < length; i++) {
                 address admin = dispute.votes[i].admin;
                 adminStakes[admin] += rewardPerAdmin;
                 hasVotedOnDispute[admin][_disputeId] = false;
@@ -522,7 +526,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      */
     function getDispute(
         uint256 _disputeId
-    ) public view returns (Dispute memory) {
+    ) external view returns (Dispute memory) {
         return disputes[_disputeId];
     }
 
@@ -531,7 +535,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @param _admin 管理员地址
      * @return 质押金额
      */
-    function getAdminStake(address _admin) public view returns (uint256) {
+    function getAdminStake(address _admin) external view returns (uint256) {
         return adminStakes[_admin];
     }
 }

@@ -2,6 +2,11 @@
 pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
+import "../contracts/TaskToken.sol";
+import "../contracts/DisputeResolver.sol";
+import "../contracts/task/FixedPaymentTask.sol";
+import "../contracts/task/BiddingTask.sol";
+import "../contracts/task/MilestonePaymentTask.sol";
 
 /**
  * @notice Deploy script for YourContract contract
@@ -23,5 +28,35 @@ contract DeployYourContract is ScaffoldETHDeploy {
      *      - Setup correct `deployer` account and fund it
      *      - Export contract addresses & ABIs to `nextjs` packages
      */
-    function run() external ScaffoldEthDeployerRunner {}
+    function run() external ScaffoldEthDeployerRunner {
+        // Deploy TaskToken contract
+        TaskToken taskToken = new TaskToken("Task Token", "TASK", 18);
+        console.log("TaskToken deployed to:", address(taskToken));
+        
+        // Deploy DisputeResolver contract
+        DisputeResolver disputeResolver = new DisputeResolver(taskToken);
+        console.log("DisputeResolver deployed to:", address(disputeResolver));
+        
+        // Deploy FixedPaymentTask contract
+        FixedPaymentTask fixedPaymentTask = new FixedPaymentTask(taskToken, disputeResolver);
+        console.log("FixedPaymentTask deployed to:", address(fixedPaymentTask));
+        
+        // Deploy BiddingTask contract
+        BiddingTask biddingTask = new BiddingTask(taskToken, disputeResolver);
+        console.log("BiddingTask deployed to:", address(biddingTask));
+        
+        // Deploy MilestonePaymentTask contract
+        MilestonePaymentTask milestonePaymentTask = new MilestonePaymentTask(taskToken, disputeResolver);
+        console.log("MilestonePaymentTask deployed to:", address(milestonePaymentTask));
+        
+        // Output deployment information
+        console.log("=====================================");
+        console.log("All contracts deployed successfully:");
+        console.log("- TaskToken: ", address(taskToken));
+        console.log("- DisputeResolver: ", address(disputeResolver));
+        console.log("- FixedPaymentTask: ", address(fixedPaymentTask));
+        console.log("- BiddingTask: ", address(biddingTask));
+        console.log("- MilestonePaymentTask: ", address(milestonePaymentTask));
+        console.log("=====================================");
+    }
 }

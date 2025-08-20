@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -11,19 +11,19 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract TaskToken is ERC20, Ownable {
     // 代币精度
-    uint8 private _decimals;
+    uint8 private immutable _decimals;
 
     /**
      * @notice 构造函数
-     * @param name 代币名称
-     * @param symbol 代币符号
+     * @param _name 代币名称
+     * @param _symbol 代币符号
      * @param decimals_ 代币精度
      */
     constructor(
-        string memory name,
-        string memory symbol,
+        string memory _name,
+        string memory _symbol,
         uint8 decimals_
-    ) ERC20(name, symbol) Ownable(msg.sender) {
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
         _decimals = decimals_;
     }
 
@@ -57,7 +57,10 @@ contract TaskToken is ERC20, Ownable {
      * @param taskContract 任务合约地址
      * @param amount 授权数量
      */
-    function approveTaskContract(address taskContract, uint256 amount) public {
+    function approveTaskContract(
+        address taskContract,
+        uint256 amount
+    ) external {
         _approve(msg.sender, taskContract, amount);
     }
 }

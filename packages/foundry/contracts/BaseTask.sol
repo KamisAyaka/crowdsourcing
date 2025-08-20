@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -52,14 +52,16 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     error NoRevenueToWithdraw();
     error RewardMoreThanZero();
     error InvalidDeadline();
-    error InvalidDisputeResolverAddress();
-    error DisputeFilingFailed();
+    error BaseTask_InvalidTaskToken();
+    error BaseTask_InvalidDisputeResolver();
 
     // 平台费用 (以基点计算，100 = 1%)
     uint256 public platformFee = 100; // 1%
 
+    uint256 public constant DenominatorFee = 1e4;
+
     // 用户提交证明后最快申请纠纷的时间
-    uint256 minTimeBeforeDispute = 3 days;
+    uint256 constant minTimeBeforeDispute = 3 days;
 
     // 任务计数器
     uint256 public taskCounter;
@@ -79,6 +81,9 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     // 事件定义
     event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
     event DisputeResolverUpdated(address oldResolver, address newResolver);
+    event TaskDeadlineChanged(uint256 taskId, uint256 newDeadline);
+    event RewardIncreased(uint256 taskId, uint256 amount);
+    event WithdrawPlatformRevenue(address owner, uint256 amount);
 
     /**
      * @notice modifier，检查调用者是否为任务创建者
@@ -100,6 +105,12 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         IERC20 _taskToken,
         DisputeResolver _disputeResolver
     ) Ownable(msg.sender) {
+        if (address(_taskToken) == address(0)) {
+            revert BaseTask_InvalidTaskToken();
+        }
+        if (address(_disputeResolver) == address(0)) {
+            revert BaseTask_InvalidDisputeResolver();
+        }
         taskToken = _taskToken;
         disputeResolver = _disputeResolver;
     }
@@ -146,8 +157,9 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         address _worker,
         address _taskCreator,
         uint256 _rewardAmount,
-        string memory _proofOfWork
+        string storage _proofOfWork
     ) internal {
+        tasks[_taskId].totalreward -= _rewardAmount;
         // 批准纠纷解决合约转移所需的资金
         taskToken.safeIncreaseAllowance(
             address(disputeResolver),
@@ -164,15 +176,13 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
             _rewardAmount, // 奖励金额
             _proofOfWork // 工作量证明内容
         );
-
-        tasks[_taskId].totalreward -= _rewardAmount;
     }
 
     /**
      * @notice 更新平台费用
      * @param _newFee 新费用 (基点)
      */
-    function updatePlatformFee(uint256 _newFee) public onlyOwner {
+    function updatePlatformFee(uint256 _newFee) external onlyOwner {
         if (_newFee > 1000) {
             revert FeeTooHigh(_newFee);
         }
@@ -184,21 +194,21 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     /**
      * @notice 暂停合约（紧急情况下）
      */
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
     /**
      * @notice 恢复合约
      */
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
     /**
      * @notice 提取平台收入
      */
-    function withdrawPlatformRevenue() public onlyOwner nonReentrant {
+    function withdrawPlatformRevenue() external nonReentrant onlyOwner {
         if (totalPlatformRevenue == 0) {
             revert NoRevenueToWithdraw();
         }
@@ -207,9 +217,11 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         totalPlatformRevenue = 0;
 
         taskToken.safeTransfer(owner(), amount);
+
+        emit WithdrawPlatformRevenue(owner(), amount);
     }
 
-    function changedeadline(uint256 _taskId, uint256 _deadline) public {
+    function changedeadline(uint256 _taskId, uint256 _deadline) external {
         Task storage task = tasks[_taskId];
 
         if (task.creator != msg.sender) {
@@ -220,9 +232,10 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         }
 
         task.deadline = _deadline;
+        emit TaskDeadlineChanged(_taskId, task.deadline);
     }
 
-    function increaseReward(uint256 _taskId, uint256 _reward) public {
+    function increaseReward(uint256 _taskId, uint256 _reward) external {
         Task storage task = tasks[_taskId];
 
         if (task.creator != msg.sender) {
@@ -235,6 +248,8 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         task.totalreward += _reward;
 
         taskToken.safeTransferFrom(msg.sender, address(this), _reward);
+
+        emit RewardIncreased(_taskId, task.totalreward);
     }
 
     /**

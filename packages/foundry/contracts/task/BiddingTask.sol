@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "../BaseTask.sol";
 
@@ -110,13 +110,6 @@ contract BiddingTask is BaseTask {
         _;
     }
 
-    modifier onlyTaskWorkerAddress(uint256 _taskId, address _worker) {
-        if (taskWorker[_taskId] != _worker) {
-            revert BiddingTask_InvalidWorkerAddress();
-        }
-        _;
-    }
-
     /**
      * @notice 构造函数
      * @param _taskToken 平台代币地址
@@ -169,7 +162,7 @@ contract BiddingTask is BaseTask {
         uint256 _amount,
         string memory _description,
         uint256 _estimatedTime
-    ) public whenNotPaused {
+    ) external whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否开放竞标
@@ -212,7 +205,7 @@ contract BiddingTask is BaseTask {
     function acceptBid(
         uint256 _taskId,
         uint256 _bidIndex
-    ) public onlyTaskCreator(_taskId) whenNotPaused {
+    ) external onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否开放
@@ -251,10 +244,10 @@ contract BiddingTask is BaseTask {
         // 设置任务报酬
         task.totalreward = _reward;
 
-        taskToken.transferFrom(msg.sender, address(this), _reward);
-
         // 更新任务状态为进行中
         task.status = TaskStatus.InProgress;
+
+        taskToken.safeTransferFrom(msg.sender, address(this), _reward);
 
         emit BiddingTask_TaskWorkerAdded(_taskId, _worker);
     }
@@ -276,6 +269,9 @@ contract BiddingTask is BaseTask {
             revert BiddingTask_TaskCannotBeCancelled();
         }
 
+        // 清理任务工作者并更新状态
+        task.status = TaskStatus.Cancelled;
+
         if (task.status == TaskStatus.InProgress) {
             // 获取当前分配的工作者
             address worker = taskWorker[_taskId];
@@ -294,8 +290,7 @@ contract BiddingTask is BaseTask {
                 );
             }
         }
-        // 清理任务工作者并更新状态
-        task.status = TaskStatus.Cancelled;
+
         emit BiddingTask_TaskCancelled(_taskId);
     }
 
@@ -307,7 +302,12 @@ contract BiddingTask is BaseTask {
     function submitProofOfWork(
         uint256 _taskId,
         string memory _proof
-    ) public whenNotPaused onlyTaskWorker(_taskId) onlyTaskInProgress(_taskId) {
+    )
+        external
+        whenNotPaused
+        onlyTaskWorker(_taskId)
+        onlyTaskInProgress(_taskId)
+    {
         Task storage task = tasks[_taskId];
         if (block.timestamp >= task.deadline) {
             revert BiddingTask_TaskDeadlinePassed();
@@ -340,13 +340,16 @@ contract BiddingTask is BaseTask {
         uint256 _taskId,
         address _worker
     )
-        public
+        external
         onlyTaskCreator(_taskId)
         whenNotPaused
         onlyTaskInProgress(_taskId)
-        onlyTaskWorkerAddress(_taskId, _worker)
     {
         Task storage task = tasks[_taskId];
+
+        if (taskWorker[_taskId] != _worker) {
+            revert BiddingTask_InvalidWorkerAddress();
+        }
 
         ProofOfWork storage proof = taskWorkProofs[_taskId][_worker];
         if (!proof.submitted) {
@@ -365,7 +368,7 @@ contract BiddingTask is BaseTask {
      */
     function payTask(
         uint256 _taskId
-    ) public onlyTaskWorker(_taskId) whenNotPaused {
+    ) external onlyTaskWorker(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否可以支付
@@ -374,7 +377,7 @@ contract BiddingTask is BaseTask {
         }
 
         // 计算平台费用
-        uint256 fee = (task.totalreward * platformFee) / 10000;
+        uint256 fee = (task.totalreward * platformFee) / DenominatorFee;
         uint256 payment = task.totalreward - fee;
 
         // 更新平台总收入
@@ -399,7 +402,12 @@ contract BiddingTask is BaseTask {
      */
     function fileDisputeByWorker(
         uint256 _taskId
-    ) public onlyTaskWorker(_taskId) onlyTaskInProgress(_taskId) whenNotPaused {
+    )
+        external
+        onlyTaskWorker(_taskId)
+        onlyTaskInProgress(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
         ProofOfWork storage proof = taskWorkProofs[_taskId][msg.sender];
 
@@ -437,7 +445,7 @@ contract BiddingTask is BaseTask {
      * @param _taskId 任务ID
      * @return 竞标数量
      */
-    function getBidCount(uint256 _taskId) public view returns (uint256) {
+    function getBidCount(uint256 _taskId) external view returns (uint256) {
         return taskBids[_taskId].length;
     }
 
@@ -450,7 +458,7 @@ contract BiddingTask is BaseTask {
     function getBid(
         uint256 _taskId,
         uint256 _bidIndex
-    ) public view returns (Bid memory) {
+    ) external view returns (Bid memory) {
         if (_bidIndex >= taskBids[_taskId].length) {
             revert BiddingTask_InvalidBidIndex();
         }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "../BaseTask.sol";
 
@@ -85,18 +85,14 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskId 任务ID
      */
     modifier onlyTaskInProgress(uint256 _taskId) {
-        if (tasks[_taskId].status != TaskStatus.InProgress) {
+        Task storage task = tasks[_taskId];
+        if (task.status != TaskStatus.InProgress) {
             revert FixedPaymentTask_TaskNotInProgress();
         }
         _;
     }
 
-    modifier onlyTaskWorkerAddress(uint256 _taskId, address _worker) {
-        if (taskWorker[_taskId] != _worker) {
-            revert FixedPaymentTask_NoWorkerAssigned();
-        }
-        _;
-    }
+    // 移除 onlyTaskWorkerAddress 修饰符，因为已内联到函数中
 
     /**
      * @notice 构造函数
@@ -195,6 +191,8 @@ contract FixedPaymentTask is BaseTask {
             revert FixedPaymentTask_TaskCannotBeCancelled();
         }
 
+        task.status = TaskStatus.Cancelled;
+
         // 获取当前分配的工作者
         address worker = taskWorker[_taskId];
 
@@ -215,8 +213,6 @@ contract FixedPaymentTask is BaseTask {
             task.totalreward = 0;
         }
 
-        // 清理任务工作者并更新状态
-        task.status = TaskStatus.Cancelled;
         emit FixedPaymentTask_TaskCancelled(_taskId);
     }
 
@@ -228,7 +224,12 @@ contract FixedPaymentTask is BaseTask {
     function submitProofOfWork(
         uint256 _taskId,
         string memory _proof
-    ) public whenNotPaused onlyTaskWorker(_taskId) onlyTaskInProgress(_taskId) {
+    )
+        external
+        whenNotPaused
+        onlyTaskWorker(_taskId)
+        onlyTaskInProgress(_taskId)
+    {
         Task storage task = tasks[_taskId];
         if (block.timestamp >= task.deadline) {
             revert FixedPaymentTask_TaskDeadlinePassed();
@@ -261,14 +262,17 @@ contract FixedPaymentTask is BaseTask {
         uint256 _taskId,
         address _worker
     )
-        public
+        external
         onlyTaskCreator(_taskId)
         whenNotPaused
         onlyTaskInProgress(_taskId)
-        onlyTaskWorkerAddress(_taskId, _worker)
     {
-        Task storage task = tasks[_taskId];
+        // 内联 onlyTaskWorkerAddress 修饰符逻辑
+        if (taskWorker[_taskId] != _worker) {
+            revert FixedPaymentTask_NoWorkerAssigned();
+        }
 
+        Task storage task = tasks[_taskId];
         ProofOfWork storage proof = taskWorkProofs[_taskId][_worker];
         if (!proof.submitted) {
             revert FixedPaymentTask_ProofNotSubmitted();
@@ -286,7 +290,7 @@ contract FixedPaymentTask is BaseTask {
      */
     function payTask(
         uint256 _taskId
-    ) public onlyTaskWorker(_taskId) whenNotPaused {
+    ) external onlyTaskWorker(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否可以支付
@@ -295,7 +299,7 @@ contract FixedPaymentTask is BaseTask {
         }
 
         // 计算平台费用
-        uint256 fee = (task.totalreward * platformFee) / 10000;
+        uint256 fee = (task.totalreward * platformFee) / DenominatorFee;
         uint256 payment = task.totalreward - fee;
 
         // 更新平台总收入
@@ -320,7 +324,12 @@ contract FixedPaymentTask is BaseTask {
      */
     function fileDisputeByWorker(
         uint256 _taskId
-    ) public onlyTaskWorker(_taskId) onlyTaskInProgress(_taskId) whenNotPaused {
+    )
+        external
+        onlyTaskWorker(_taskId)
+        onlyTaskInProgress(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
         ProofOfWork storage proof = taskWorkProofs[_taskId][msg.sender];
 

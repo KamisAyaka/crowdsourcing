@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.20;
 
 import "../BaseTask.sol";
 
@@ -47,6 +47,7 @@ contract MilestonePaymentTask is BaseTask {
     error MilestonePaymentTask_OnlyOneWorkerAllowed();
     error MilestonePaymentTask_DeadlinePassed();
     error MilestonePaymentTask_MilestoneNotSubmitted();
+    error MilestonePaymentTask_DisputeSubmissionPeriodNotReached();
 
     // 自定义事件
     event MilestonePaymentTask_TaskWorkerAdded(
@@ -86,6 +87,8 @@ contract MilestonePaymentTask is BaseTask {
         string title,
         uint256 deadline
     );
+
+    event MilestonePaymentTask_TaskCompleted(uint256 indexed taskId);
 
     /**
      * @notice modifier，检查调用者是否为任务的工作者
@@ -207,7 +210,7 @@ contract MilestonePaymentTask is BaseTask {
         uint256 _taskId,
         string memory _description,
         uint256 _reward
-    ) public onlyTaskCreator(_taskId) whenNotPaused {
+    ) external onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 只有进行中的任务可以添加里程碑
@@ -221,7 +224,7 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         // 检查总奖励是否超过任务总奖励
-        uint256 currentTotalRewards;
+        uint256 currentTotalRewards = 0;
         Milestone[] storage milestones = taskMilestones[_taskId];
         uint256 length = milestones.length;
         for (uint256 i = 0; i < length; i++) {
@@ -266,7 +269,7 @@ contract MilestonePaymentTask is BaseTask {
         uint256 _milestoneIndex,
         string memory _proof
     )
-        public
+        external
         whenNotPaused
         onlyTaskWorker(_taskId)
         onlyTaskInProgress(_taskId)
@@ -310,7 +313,7 @@ contract MilestonePaymentTask is BaseTask {
         uint256 _taskId,
         uint256 _milestoneIndex
     )
-        public
+        external
         onlyTaskCreator(_taskId)
         whenNotPaused
         InvalidMilestoneIndex(_taskId, _milestoneIndex)
@@ -335,7 +338,7 @@ contract MilestonePaymentTask is BaseTask {
      * @notice 标记任务为完成
      * @param _taskId 任务ID
      */
-    function completeTask(uint256 _taskId) public whenNotPaused {
+    function completeTask(uint256 _taskId) external whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查是否所有里程碑都已完成
@@ -350,6 +353,8 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         task.status = TaskStatus.Completed;
+
+        emit MilestonePaymentTask_TaskCompleted(_taskId);
     }
 
     /**
@@ -374,7 +379,7 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         // 计算平台费用
-        uint256 fee = (milestone.reward * platformFee) / 10000;
+        uint256 fee = (milestone.reward * platformFee) / DenominatorFee;
         uint256 payment = milestone.reward - fee;
 
         // 更新平台总收入
@@ -411,6 +416,9 @@ contract MilestonePaymentTask is BaseTask {
             revert MilestonePaymentTask_TaskCannotBeCancelled();
         }
 
+        // 立即更新状态，防止重入
+        task.status = TaskStatus.Cancelled;
+
         // 检查是否有工作者以及工作量证明，如果有则可以提交纠纷
         address worker = taskWorker[_taskId];
         Milestone[] storage milestones = taskMilestones[_taskId];
@@ -445,10 +453,11 @@ contract MilestonePaymentTask is BaseTask {
 
         // 如果还有剩余资金，将其返还给任务创建者
         if (task.totalreward > 0) {
-            taskToken.safeTransfer(task.creator, task.totalreward);
+            uint256 refundAmount = task.totalreward;
             task.totalreward = 0;
+            taskToken.safeTransfer(task.creator, refundAmount);
         }
-        task.status = TaskStatus.Cancelled;
+
         emit MilestonePaymentTask_TaskCancelled(_taskId);
     }
 
@@ -464,7 +473,7 @@ contract MilestonePaymentTask is BaseTask {
         uint256 _taskId,
         uint256 _milestoneIndex
     )
-        public
+        external
         onlyTaskWorker(_taskId)
         onlyTaskInProgress(_taskId)
         whenNotPaused
@@ -494,7 +503,7 @@ contract MilestonePaymentTask is BaseTask {
         // 这给任务创建者一些时间来批准工作证明
 
         if (block.timestamp < proof.submittedAt + minTimeBeforeDispute) {
-            revert MilestonePaymentTask_TaskNotInProgress(_taskId);
+            revert MilestonePaymentTask_DisputeSubmissionPeriodNotReached();
         }
 
         // 提交纠纷
@@ -514,7 +523,9 @@ contract MilestonePaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @return 里程碑数量
      */
-    function getMilestonesCount(uint256 _taskId) public view returns (uint256) {
+    function getMilestonesCount(
+        uint256 _taskId
+    ) external view returns (uint256) {
         return taskMilestones[_taskId].length;
     }
 
@@ -527,7 +538,7 @@ contract MilestonePaymentTask is BaseTask {
     function getMilestone(
         uint256 _taskId,
         uint256 _milestoneIndex
-    ) public view returns (Milestone memory) {
+    ) external view returns (Milestone memory) {
         return taskMilestones[_taskId][_milestoneIndex];
     }
 }
