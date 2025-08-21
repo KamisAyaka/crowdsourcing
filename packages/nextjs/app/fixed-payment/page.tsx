@@ -1,27 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useAccount } from "wagmi";
-import { Address } from "~~/components/scaffold-eth";
+import { useEffect, useState } from "react";
+import { CreateTaskModal } from "./_components/CreateTaskModal";
+import { TaskCard } from "./_components/TaskCard";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
-import { notification } from "~~/utils/scaffold-eth";
 
 const FixedPaymentTasksPage = () => {
-  const { address: connectedAddress } = useAccount();
-  const { targetNetwork } = useTargetNetwork();
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
-  const [taskDeadline, setTaskDeadline] = useState(0);
-  const [workerAddress, setWorkerAddress] = useState("");
-  const [taskReward, setTaskReward] = useState(0);
-  const [activeTab, setActiveTab] = useState("create");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<number>(0); // 默认只显示Open状态的任务
   const writeTxn = useTransactor();
 
   // 读取合约信息
-  const { data: taskCounter, isLoading: isTaskCounterLoading } = useScaffoldReadContract({
+  const {
+    data: taskCounter,
+    isLoading: isTaskCounterLoading,
+    refetch: refetchTaskCounter,
+  } = useScaffoldReadContract({
     contractName: "FixedPaymentTask",
     functionName: "taskCounter",
   });
@@ -32,12 +27,26 @@ const FixedPaymentTasksPage = () => {
   });
 
   // 写入合约功能 - 使用推荐的对象参数版本
-  const { writeContractAsync: createTask } = useScaffoldWriteContract({ contractName: "FixedPaymentTask" });
-  const { writeContractAsync: addWorker } = useScaffoldWriteContract({ contractName: "FixedPaymentTask" });
+  const [taskIds, setTaskIds] = useState<bigint[]>([]);
 
-  const handleCreateTask = async () => {
-    if (!taskTitle || !taskDescription || taskDeadline <= 0) {
-      notification.error("请填写所有任务信息");
+  // 写入合约功能 - 使用推荐的对象参数版本
+  const { writeContractAsync: createTask } = useScaffoldWriteContract({ contractName: "FixedPaymentTask" });
+
+  // 当任务计数改变时，更新任务ID列表
+  useEffect(() => {
+    if (taskCounter && taskCounter > 0n) {
+      const ids = [];
+      for (let i = 1n; i <= taskCounter; i++) {
+        ids.push(i);
+      }
+      setTaskIds(ids);
+    } else {
+      setTaskIds([]);
+    }
+  }, [taskCounter]);
+
+  const handleCreateTask = async (title: string, description: string, deadline: number) => {
+    if (!title || !description || deadline <= 0) {
       return;
     }
 
@@ -46,69 +55,75 @@ const FixedPaymentTasksPage = () => {
         () =>
           createTask({
             functionName: "createTask",
-            args: [taskTitle, taskDescription, BigInt(Math.floor(Date.now() / 1000) + taskDeadline)],
+            args: [title, description, BigInt(Math.floor(Date.now() / 1000) + deadline)],
           }) as Promise<`0x${string}`>,
       );
+      // 重新获取任务计数
+      refetchTaskCounter();
 
-      notification.success("任务创建成功");
-      // 清空表单
-      setTaskTitle("");
-      setTaskDescription("");
-      setTaskDeadline(0);
+      setIsModalOpen(false);
     } catch (e) {
       console.error("Error creating task:", e);
-      notification.error("创建任务失败");
     }
   };
 
-  const handleAddWorker = async (taskId: number) => {
-    if (!workerAddress || taskReward <= 0) {
-      notification.error("请填写工作者地址和报酬");
-      return;
-    }
-
-    try {
-      await writeTxn(
-        () =>
-          addWorker({
-            functionName: "addWorker",
-            args: [BigInt(taskId), workerAddress, BigInt(taskReward)],
-          }) as Promise<`0x${string}`>,
-      );
-
-      notification.success("工作者添加成功");
-      // 清空表单
-      setWorkerAddress("");
-      setTaskReward(0);
-    } catch (e) {
-      console.error("Error adding worker:", e);
-      notification.error("添加工作者失败");
-    }
-  };
+  // 获取状态筛选选项（移除"全部状态"选项）
+  const statusOptions = [
+    { value: 0, label: "Open" },
+    { value: 1, label: "InProgress" },
+    { value: 2, label: "Completed" },
+    { value: 3, label: "Paid" },
+    { value: 4, label: "Cancelled" },
+  ];
 
   return (
     <div className="flex flex-col items-center pt-10 px-4">
-      <div className="flex justify-between items-center w-full max-w-6xl mb-8">
-        <h1 className="text-3xl font-bold">固定薪酬任务</h1>
-        <Link href="/" className="btn btn-secondary">
-          返回主页
-        </Link>
-      </div>
-
-      <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl mb-8">
+      {/* 我的任务部分，放到最上面 */}
+      <div className="w-full max-w-6xl mb-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">任务概览</h2>
-          <div className="flex items-center gap-4">
-            <div className="text-sm">
-              <span className="font-medium">网络:</span> {targetNetwork.name}
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">已连接:</span>
-              <Address address={connectedAddress} />
-            </div>
+          <h2 className="text-2xl font-bold">任务列表</h2>
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            创建新任务
+          </button>
+        </div>
+
+        {/* 状态筛选器 */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2">
+            {statusOptions.map(option => (
+              <button
+                key={option.label}
+                className={`btn btn-sm ${selectedStatus === option.value ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setSelectedStatus(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isTaskCounterLoading ? (
+            <div className="col-span-full text-center py-10">
+              <span className="loading loading-spinner loading-lg">加载中...</span>
+            </div>
+          ) : taskIds.length > 0 ? (
+            taskIds.map(taskId => (
+              <TaskCard key={`task-${taskId.toString()}`} taskId={taskId} selectedStatus={selectedStatus} />
+            ))
+          ) : (
+            <div className="col-span-full text-center py-10">
+              <p className="text-gray-500">暂无任务</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 任务概览部分，单独分开并放到下面 */}
+      <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">任务概览</h2>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="bg-base-200 p-4 rounded-xl">
             <p className="text-sm text-gray-500">总任务数</p>
@@ -129,102 +144,6 @@ const FixedPaymentTasksPage = () => {
             <p className="text-2xl font-bold">固定薪酬</p>
           </div>
         </div>
-
-        <div className="tabs tabs-boxed mb-6">
-          <a className={`tab ${activeTab === "create" ? "tab-active" : ""}`} onClick={() => setActiveTab("create")}>
-            创建任务
-          </a>
-          <a className={`tab ${activeTab === "manage" ? "tab-active" : ""}`} onClick={() => setActiveTab("manage")}>
-            管理任务
-          </a>
-        </div>
-
-        {activeTab === "create" && (
-          <div className="space-y-6">
-            <h3 className="text-xl font-bold">创建新任务</h3>
-            <div className="space-y-4">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">任务标题</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="输入任务标题"
-                  className="input input-bordered w-full"
-                  value={taskTitle}
-                  onChange={e => setTaskTitle(e.target.value)}
-                />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">任务描述</span>
-                </label>
-                <textarea
-                  placeholder="详细描述任务要求"
-                  className="textarea textarea-bordered w-full"
-                  value={taskDescription}
-                  onChange={e => setTaskDescription(e.target.value)}
-                />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">截止时间 (秒)</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="任务截止时间"
-                  className="input input-bordered w-full"
-                  value={taskDeadline || ""}
-                  onChange={e => setTaskDeadline(Number(e.target.value))}
-                />
-              </div>
-              <button className="btn btn-primary w-full" onClick={handleCreateTask}>
-                创建任务
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "manage" && (
-          <div className="space-y-6">
-            <h3 className="text-xl font-bold">添加工作者</h3>
-            <div className="space-y-4">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">任务ID</span>
-                </label>
-                <input type="number" placeholder="输入任务ID" className="input input-bordered w-full" />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">工作者地址</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="工作者钱包地址"
-                  className="input input-bordered w-full"
-                  value={workerAddress}
-                  onChange={e => setWorkerAddress(e.target.value)}
-                />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-bold">任务报酬</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="任务报酬"
-                  className="input input-bordered w-full"
-                  value={taskReward || ""}
-                  onChange={e => setTaskReward(Number(e.target.value))}
-                />
-              </div>
-              <button className="btn btn-primary w-full" onClick={() => handleAddWorker(1)}>
-                添加工作者
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl">
@@ -233,17 +152,21 @@ const FixedPaymentTasksPage = () => {
           <div className="bg-base-200 p-6 rounded-xl">
             <h3 className="font-bold text-lg mb-2">创建任务</h3>
             <p className="text-sm">
-              任务创建者可以创建一个固定薪酬任务，指定任务标题、描述和截止时间。 创建任务时不需要指定工作者和报酬。
+              任务创建者可以创建一个固定薪酬任务，指定任务标题、描述、截止时间和报酬。
+              创建任务时需要存入报酬，工作者可以接受任务。
             </p>
           </div>
           <div className="bg-base-200 p-6 rounded-xl">
-            <h3 className="font-bold text-lg mb-2">添加工作者</h3>
+            <h3 className="font-bold text-lg mb-2">接受任务</h3>
             <p className="text-sm">
-              任务创建者可以为已创建的任务添加工作者和报酬。 添加后，报酬会从创建者账户转移到合约中托管。
+              工作者可以接受已创建的固定薪酬任务，任务报酬将被锁定在合约中。
+              完成任务后，工作者可以提交工作量证明等待任务创建者验证。
             </p>
           </div>
         </div>
       </div>
+
+      <CreateTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onCreate={handleCreateTask} />
     </div>
   );
 };

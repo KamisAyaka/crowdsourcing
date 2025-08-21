@@ -1,13 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { BugAntIcon, ClipboardDocumentIcon, MagnifyingGlassIcon, WalletIcon } from "@heroicons/react/24/outline";
+import {
+  BugAntIcon,
+  ClipboardDocumentIcon,
+  MagnifyingGlassIcon,
+  UserIcon,
+  WalletIcon,
+} from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+  const [searchAddress, setSearchAddress] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchAddress) {
+      window.location.href = `/user/${searchAddress}`;
+    }
+  };
 
   return (
     <>
@@ -46,6 +61,23 @@ const Home: NextPage = () => {
             </div>
           </div>
 
+          <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 px-6 py-4 mb-8">
+            <h2 className="text-2xl font-bold text-center mb-4">用户搜索</h2>
+            <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchAddress}
+                onChange={e => setSearchAddress(e.target.value)}
+                placeholder="输入用户钱包地址搜索用户资料"
+                className="input input-bordered w-full"
+              />
+              <button type="submit" className="btn btn-primary">
+                <MagnifyingGlassIcon className="h-5 w-5" />
+              </button>
+            </form>
+            <p className="text-center text-sm text-gray-500">输入有效的以太坊地址来查看用户的公开资料</p>
+          </div>
+
           <div className="text-center mt-8">
             <p className="text-lg mb-6">请使用以下功能页面与平台进行交互:</p>
           </div>
@@ -61,6 +93,16 @@ const Home: NextPage = () => {
                   固定薪酬任务
                 </Link>{" "}
                 页面创建和管理固定薪酬任务。
+              </p>
+            </div>
+            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
+              <UserIcon className="h-8 w-8 fill-secondary" />
+              <p>
+                使用{" "}
+                <Link href="/profile" passHref className="link">
+                  用户资料
+                </Link>{" "}
+                页面管理您的个人信息。
               </p>
             </div>
             <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">

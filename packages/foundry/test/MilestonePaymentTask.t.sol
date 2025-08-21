@@ -5,21 +5,24 @@ import "forge-std/Test.sol";
 import "../contracts/task/MilestonePaymentTask.sol";
 import "../contracts/TaskToken.sol";
 import "../contracts/DisputeResolver.sol";
+import "../contracts/UserInfo.sol";
+import "../contracts/interface/IDisputeResolver.sol";
 
 contract MilestonePaymentTaskTest is Test {
     MilestonePaymentTask public milestonePaymentTask;
     TaskToken public taskToken;
     DisputeResolver public disputeResolver;
+    UserInfo public userInfo;
 
     address public owner;
     address public taskCreator;
     address public worker;
     address public otherUser;
 
-    uint256 public constant TOTAL_REWARD = 1000 * 10 ** 18;
-    uint256 public constant MILESTONE_REWARD_1 = 400 * 10 ** 18;
-    uint256 public constant MILESTONE_REWARD_2 = 600 * 10 ** 18;
+    uint256 public constant TOTAL_REWARD = 300 * 10 ** 18;
     uint256 public constant ADMIN_STAKE_AMOUNT = 1000 * 10 ** 18;
+    uint256 public constant MILESTONE_REWARD_1 = 100 * 10 ** 18;
+    uint256 public constant MILESTONE_REWARD_2 = 200 * 10 ** 18;
 
     function setUp() public {
         owner = address(this);
@@ -38,41 +41,31 @@ contract MilestonePaymentTaskTest is Test {
         // 部署DisputeResolver合约
         disputeResolver = new DisputeResolver(taskToken);
 
+        // 部署UserInfo合约
+        userInfo = new UserInfo();
+
         // 部署MilestonePaymentTask合约
-        milestonePaymentTask = new MilestonePaymentTask(taskToken, disputeResolver);
+        milestonePaymentTask = new MilestonePaymentTask(taskToken, IDisputeResolver(address(disputeResolver)));
 
         // 设置授权
         vm.prank(taskCreator);
-        taskToken.approveTaskContract(
-            address(milestonePaymentTask),
-            TOTAL_REWARD * 10
-        );
+        taskToken.approveTaskContract(address(milestonePaymentTask), TOTAL_REWARD * 10);
 
         vm.prank(worker);
-        taskToken.approveTaskContract(
-            address(disputeResolver),
-            ADMIN_STAKE_AMOUNT
-        );
+        taskToken.approveTaskContract(address(disputeResolver), ADMIN_STAKE_AMOUNT);
     }
 
     // 测试合约部署
     function testDeployment() public view {
         assertEq(milestonePaymentTask.owner(), owner);
         assertEq(address(milestonePaymentTask.taskToken()), address(taskToken));
-        assertEq(
-            address(milestonePaymentTask.disputeResolver()),
-            address(disputeResolver)
-        );
+        assertEq(address(milestonePaymentTask.disputeResolver()), address(disputeResolver));
     }
 
     // 测试创建任务
     function testCreateTask() public {
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         (
             uint256 id,
@@ -102,38 +95,21 @@ contract MilestonePaymentTaskTest is Test {
 
         vm.prank(taskCreator);
         vm.expectRevert(BaseTask.InvalidDeadline.selector);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp - 1 hours
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp - 1 hours);
     }
 
     // 测试添加工作者
     function testAddWorker() public {
         // 先创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者并存入报酬
         vm.prank(taskCreator);
         milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
 
         // 检查任务状态
-        (
-            ,
-            ,
-            ,
-            ,
-            uint256 reward,
-            ,
-            BaseTask.TaskStatus status,
-
-        ) = milestonePaymentTask.tasks(1);
+        (,,,, uint256 reward,, BaseTask.TaskStatus status,) = milestonePaymentTask.tasks(1);
         assertEq(reward, TOTAL_REWARD);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.InProgress));
         assertEq(milestonePaymentTask.taskWorker(1), worker);
@@ -144,21 +120,11 @@ contract MilestonePaymentTaskTest is Test {
     function testAddWorkerOnlyTaskCreator() public {
         // 先创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 其他用户尝试添加工作者
         vm.prank(otherUser);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BaseTask.OnlyTaskCreator.selector,
-                otherUser,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, otherUser, 1));
         milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
     }
 
@@ -166,17 +132,11 @@ contract MilestonePaymentTaskTest is Test {
     function testAddWorkerInvalidAddress() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 尝试添加零地址工作者应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_InvalidWorkerAddress.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_InvalidWorkerAddress.selector);
         milestonePaymentTask.addWorker(1, address(0), TOTAL_REWARD);
     }
 
@@ -184,11 +144,7 @@ contract MilestonePaymentTaskTest is Test {
     function testAddWorkerNotOpen() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -198,7 +154,7 @@ contract MilestonePaymentTaskTest is Test {
         // 添加里程碑
         vm.prank(taskCreator);
         milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
-        
+
         // 提交工作量证明
         vm.prank(worker);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "Proof of work");
@@ -206,7 +162,7 @@ contract MilestonePaymentTaskTest is Test {
         // 批准里程碑
         vm.prank(taskCreator);
         milestonePaymentTask.approveMilestone(1, 0);
-        
+
         // 完成任务
         vm.prank(taskCreator);
         milestonePaymentTask.completeTask(1);
@@ -214,12 +170,7 @@ contract MilestonePaymentTaskTest is Test {
         address anotherWorker = address(0x4);
         // 尝试向已完成的任务添加另一个工作者应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MilestonePaymentTask.MilestonePaymentTask_TaskNotOpen.selector,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(MilestonePaymentTask.MilestonePaymentTask_TaskNotOpen.selector, 1));
         milestonePaymentTask.addWorker(1, anotherWorker, TOTAL_REWARD);
     }
 
@@ -227,11 +178,7 @@ contract MilestonePaymentTaskTest is Test {
     function testAddMilestone() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -243,7 +190,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 验证里程碑已添加
         assertEq(milestonePaymentTask.getMilestonesCount(1), 1);
-        
+
         MilestonePaymentTask.Milestone memory milestone = milestonePaymentTask.getMilestone(1, 0);
         assertEq(milestone.description, "Milestone 1");
         assertEq(milestone.reward, MILESTONE_REWARD_1);
@@ -258,11 +205,7 @@ contract MilestonePaymentTaskTest is Test {
     function testAddMultipleMilestones() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -276,11 +219,11 @@ contract MilestonePaymentTaskTest is Test {
 
         // 验证里程碑已添加
         assertEq(milestonePaymentTask.getMilestonesCount(1), 2);
-        
+
         MilestonePaymentTask.Milestone memory milestone1 = milestonePaymentTask.getMilestone(1, 0);
         assertEq(milestone1.description, "Milestone 1");
         assertEq(milestone1.reward, MILESTONE_REWARD_1);
-        
+
         MilestonePaymentTask.Milestone memory milestone2 = milestonePaymentTask.getMilestone(1, 1);
         assertEq(milestone2.description, "Milestone 2");
         assertEq(milestone2.reward, MILESTONE_REWARD_2);
@@ -290,11 +233,7 @@ contract MilestonePaymentTaskTest is Test {
     function testAddMilestoneRewardInsufficient() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -302,9 +241,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 添加里程碑，奖励超过总奖励应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_RewardInsufficient.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_RewardInsufficient.selector);
         milestonePaymentTask.addMilestone(1, "Milestone 1", TOTAL_REWARD + 1);
     }
 
@@ -312,20 +249,11 @@ contract MilestonePaymentTaskTest is Test {
     function testAddMilestoneTaskNotInProgress() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 尝试在任务未进行中时添加里程碑应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MilestonePaymentTask.MilestonePaymentTask_TaskNotInProgress.selector,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(MilestonePaymentTask.MilestonePaymentTask_TaskNotInProgress.selector, 1));
         milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
     }
 
@@ -333,11 +261,7 @@ contract MilestonePaymentTaskTest is Test {
     function testSubmitMilestoneProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -363,11 +287,7 @@ contract MilestonePaymentTaskTest is Test {
     function testSubmitMilestoneProofOfWorkDeadlinePassed() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 hours
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 hours);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -382,9 +302,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者尝试提交工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_DeadlinePassed.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_DeadlinePassed.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "This is my proof of work");
     }
 
@@ -392,11 +310,7 @@ contract MilestonePaymentTaskTest is Test {
     function testSubmitMilestoneProofOfWorkEmpty() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -408,9 +322,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者尝试提交空的工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_ProofOfWorkEmpty.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_ProofOfWorkEmpty.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "");
     }
 
@@ -418,11 +330,7 @@ contract MilestonePaymentTaskTest is Test {
     function testSubmitMilestoneProofOfWorkOnlyWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -434,9 +342,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 其他用户尝试提交工作量证明应该失败
         vm.prank(otherUser);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_OnlyWorkerCanSubmitProof.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_OnlyWorkerCanSubmitProof.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "This is my proof of work");
     }
 
@@ -444,11 +350,7 @@ contract MilestonePaymentTaskTest is Test {
     function testSubmitMilestoneProofOfWorkInvalidIndex() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -460,9 +362,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者尝试使用无效的里程碑索引提交工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 1, "This is my proof of work");
     }
 
@@ -470,11 +370,7 @@ contract MilestonePaymentTaskTest is Test {
     function testApproveMilestone() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -502,11 +398,7 @@ contract MilestonePaymentTaskTest is Test {
     function testApproveMilestoneNotSubmitted() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -518,9 +410,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 任务创建者尝试批准未提交的工作量证明应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_MilestoneNotSubmitted.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_MilestoneNotSubmitted.selector);
         milestonePaymentTask.approveMilestone(1, 0);
     }
 
@@ -528,11 +418,7 @@ contract MilestonePaymentTaskTest is Test {
     function testApproveMilestoneAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -552,9 +438,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 再次批准应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_MilestoneAlreadyApproved.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_MilestoneAlreadyApproved.selector);
         milestonePaymentTask.approveMilestone(1, 0);
     }
 
@@ -565,11 +449,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -598,25 +478,15 @@ contract MilestonePaymentTaskTest is Test {
         uint256 platformFee = (MILESTONE_REWARD_1 * 100) / 10000; // 1% 平台费用
         uint256 workerPayment = MILESTONE_REWARD_1 - platformFee;
 
-        assertEq(
-            taskToken.balanceOf(worker),
-            initialWorkerBalance + workerPayment
-        );
-        assertEq(
-            milestonePaymentTask.totalPlatformRevenue(),
-            initialPlatformRevenue + platformFee
-        );
+        assertEq(taskToken.balanceOf(worker), initialWorkerBalance + workerPayment);
+        assertEq(milestonePaymentTask.totalPlatformRevenue(), initialPlatformRevenue + platformFee);
     }
 
     // 测试支付未批准的里程碑
     function testPayMilestoneNotApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -631,9 +501,7 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "This is my proof of work");
 
         // 尝试支付未批准的里程碑应该失败
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_MilestoneNotApproved.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_MilestoneNotApproved.selector);
         milestonePaymentTask.payMilestone(1, 0);
     }
 
@@ -641,11 +509,7 @@ contract MilestonePaymentTaskTest is Test {
     function testPayMilestoneAlreadyPaid() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -667,9 +531,7 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.payMilestone(1, 0);
 
         // 再次支付应该失败
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_MilestoneAlreadyPaid.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_MilestoneAlreadyPaid.selector);
         milestonePaymentTask.payMilestone(1, 0);
     }
 
@@ -677,11 +539,7 @@ contract MilestonePaymentTaskTest is Test {
     function testCompleteTask() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -703,7 +561,7 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.completeTask(1);
 
         // 验证任务状态
-        (, , , , , , BaseTask.TaskStatus status, ) = milestonePaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = milestonePaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Completed));
     }
 
@@ -711,20 +569,14 @@ contract MilestonePaymentTaskTest is Test {
     function testCompleteTaskNoMilestonesDefined() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
         milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
 
         // 尝试完成没有里程碑的任务应该失败
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_NoMilestonesDefined.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_NoMilestonesDefined.selector);
         milestonePaymentTask.completeTask(1);
     }
 
@@ -732,11 +584,7 @@ contract MilestonePaymentTaskTest is Test {
     function testCompleteTaskMilestoneNotApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -747,9 +595,7 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
 
         // 尝试完成未批准里程碑的任务应该失败
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_MilestoneNotApproved.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_MilestoneNotApproved.selector);
         milestonePaymentTask.completeTask(1);
     }
 
@@ -759,11 +605,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -774,7 +616,7 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.terminateTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = milestonePaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = milestonePaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
 
         // 验证资金已退还给任务创建者
@@ -782,52 +624,11 @@ contract MilestonePaymentTaskTest is Test {
         assertEq(taskToken.balanceOf(address(milestonePaymentTask)), 0);
     }
 
-    // 测试终止已完成的任务
-    function testTerminateTaskCannotBeCancelled() public {
-        // 创建任务
-        vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
-
-        // 添加工作者
-        vm.prank(taskCreator);
-        milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
-
-        // 添加里程碑
-        vm.prank(taskCreator);
-        milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
-
-        // 工作者提交工作量证明
-        vm.prank(worker);
-        milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "This is my proof of work");
-
-        // 任务创建者批准里程碑
-        vm.prank(taskCreator);
-        milestonePaymentTask.approveMilestone(1, 0);
-
-        // 完成任务
-        milestonePaymentTask.completeTask(1);
-
-        // 尝试终止已完成的任务应该失败
-        vm.prank(taskCreator);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_TaskCannotBeCancelled.selector
-        );
-        milestonePaymentTask.terminateTask(1);
-    }
-
     // 测试工作者提交纠纷
     function testFileDisputeByWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -856,11 +657,7 @@ contract MilestonePaymentTaskTest is Test {
     function testFileDisputeByWorkerNoProof() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -872,9 +669,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者未提交工作量证明就尝试提交纠纷应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_NoProofOfWorkSubmitted.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_NoProofOfWorkSubmitted.selector);
         milestonePaymentTask.fileDisputeByWorker(1, 0);
     }
 
@@ -882,11 +677,7 @@ contract MilestonePaymentTaskTest is Test {
     function testFileDisputeByWorkerAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -909,9 +700,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者尝试对已批准的工作量证明提交纠纷应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_ProofAlreadyApproved.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_ProofAlreadyApproved.selector);
         milestonePaymentTask.fileDisputeByWorker(1, 0);
     }
 
@@ -919,11 +708,7 @@ contract MilestonePaymentTaskTest is Test {
     function testFileDisputeByWorkerTimeNotReached() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -942,21 +727,15 @@ contract MilestonePaymentTaskTest is Test {
 
         // 尝试提交纠纷应该失败 (时间未到)
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_DisputeSubmissionPeriodNotReached.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_DisputeSubmissionPeriodNotReached.selector);
         milestonePaymentTask.fileDisputeByWorker(1, 0);
     }
-    
+
     // 测试onlyTaskWorker修饰符中的错误情况
     function testOnlyTaskWorkerModifier() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -964,31 +743,25 @@ contract MilestonePaymentTaskTest is Test {
 
         // 其他用户尝试调用仅工作者可调用的函数应该失败
         vm.prank(otherUser);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_OnlyWorkerCanSubmitProof.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_OnlyWorkerCanSubmitProof.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "Proof");
     }
-    
+
     // 测试onlyTaskInProgress修饰符中的错误情况
     function testOnlyTaskInProgressModifier() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
         milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
-        
+
         // 完成任务使其状态不是InProgress
         // 添加里程碑
         vm.prank(taskCreator);
         milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
-        
+
         // 提交工作量证明
         vm.prank(worker);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "Proof of work");
@@ -996,31 +769,22 @@ contract MilestonePaymentTaskTest is Test {
         // 批准里程碑
         vm.prank(taskCreator);
         milestonePaymentTask.approveMilestone(1, 0);
-        
+
         // 完成任务
         vm.prank(taskCreator);
         milestonePaymentTask.completeTask(1);
 
         // 工作者尝试调用仅进行中任务可调用的函数应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MilestonePaymentTask.MilestonePaymentTask_TaskNotInProgress.selector,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(MilestonePaymentTask.MilestonePaymentTask_TaskNotInProgress.selector, 1));
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "Proof");
     }
-    
+
     // 测试InvalidMilestoneIndex修饰符中的错误情况
     function testInvalidMilestoneIndexModifier() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -1028,52 +792,37 @@ contract MilestonePaymentTaskTest is Test {
 
         // 使用无效的里程碑索引调用函数应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 1, "Proof");
     }
-    
+
     // 测试addWorker函数中已经分配工作者的情况
     function testAddWorkerAlreadyAssigned() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
-        
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
+
         // 直接设置任务工作者而不调用addWorker函数
         // 这样可以测试OnlyOneWorkerAllowed错误
         vm.prank(taskCreator);
         milestonePaymentTask.addWorker(1, worker, TOTAL_REWARD);
-        
+
         // 手动设置taskWorker映射以模拟已经分配工作者的情况
         // 由于Solidity的限制，我们无法直接在测试中修改私有状态变量
         // 所以这个测试实际上无法触发OnlyOneWorkerAllowed错误
-        
+
         // 我们改为测试任务不是Open状态时的情况
         address anotherWorker = address(0x4);
         vm.prank(taskCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MilestonePaymentTask.MilestonePaymentTask_TaskNotOpen.selector,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(MilestonePaymentTask.MilestonePaymentTask_TaskNotOpen.selector, 1));
         milestonePaymentTask.addWorker(1, anotherWorker, TOTAL_REWARD);
     }
-    
+
     // 测试addMilestone函数中奖励为0的情况
     function testAddMilestoneZeroReward() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -1084,16 +833,12 @@ contract MilestonePaymentTaskTest is Test {
         vm.expectRevert(BaseTask.RewardMoreThanZero.selector);
         milestonePaymentTask.addMilestone(1, "Milestone 1", 0);
     }
-    
+
     // 测试submitMilestoneProofOfWork函数中工作量证明已批准的情况
     function testSubmitMilestoneProofOfWorkAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -1113,21 +858,15 @@ contract MilestonePaymentTaskTest is Test {
 
         // 工作者尝试再次提交工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_ProofAlreadyApproved.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_ProofAlreadyApproved.selector);
         milestonePaymentTask.submitMilestoneProofOfWork(1, 0, "Another proof");
     }
-    
+
     // 测试terminateTask函数中处理已批准但未支付的里程碑
     function testTerminateTaskWithApprovedUnpaidMilestones() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -1144,29 +883,25 @@ contract MilestonePaymentTaskTest is Test {
         // 任务创建者批准工作量证明
         vm.prank(taskCreator);
         milestonePaymentTask.approveMilestone(1, 0);
-        
+
         // 终止任务，此时应该自动支付已批准但未支付的里程碑
         vm.prank(taskCreator);
         milestonePaymentTask.terminateTask(1);
-        
+
         // 验证任务状态
-        (, , , , , , BaseTask.TaskStatus status, ) = milestonePaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = milestonePaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
-        
+
         // 验证里程碑已支付
         MilestonePaymentTask.Milestone memory milestone = milestonePaymentTask.getMilestone(1, 0);
         assertTrue(milestone.paid);
     }
-    
+
     // 测试fileDisputeByWorker函数中未定义里程碑的情况
     function testFileDisputeByWorkerNoMilestonesDefined() public {
         // 创建任务
         vm.prank(taskCreator);
-        milestonePaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -1175,9 +910,7 @@ contract MilestonePaymentTaskTest is Test {
         // 工作者尝试提交纠纷但未定义里程碑应该失败
         // 由于InvalidMilestoneIndex修饰符会先检查索引有效性，所以我们需要处理这个错误
         vm.prank(worker);
-        vm.expectRevert(
-            MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector
-        );
+        vm.expectRevert(MilestonePaymentTask.MilestonePaymentTask_InvalidMilestoneIndex.selector);
         milestonePaymentTask.fileDisputeByWorker(1, 0);
     }
 }

@@ -5,11 +5,14 @@ import "forge-std/Test.sol";
 import "../contracts/task/FixedPaymentTask.sol";
 import "../contracts/TaskToken.sol";
 import "../contracts/DisputeResolver.sol";
+import "../contracts/UserInfo.sol";
+import "../contracts/interface/IDisputeResolver.sol";
 
 contract FixedPaymentTaskTest is Test {
     FixedPaymentTask public fixedPaymentTask;
     TaskToken public taskToken;
     DisputeResolver public disputeResolver;
+    UserInfo public userInfo;
 
     address public owner;
     address public taskCreator;
@@ -36,41 +39,31 @@ contract FixedPaymentTaskTest is Test {
         // 部署DisputeResolver合约
         disputeResolver = new DisputeResolver(taskToken);
 
+        // 部署UserInfo合约
+        userInfo = new UserInfo();
+
         // 部署FixedPaymentTask合约
-        fixedPaymentTask = new FixedPaymentTask(taskToken, disputeResolver);
+        fixedPaymentTask = new FixedPaymentTask(taskToken, IDisputeResolver(address(disputeResolver)));
 
         // 设置授权
         vm.prank(taskCreator);
-        taskToken.approveTaskContract(
-            address(fixedPaymentTask),
-            REWARD_AMOUNT * 10
-        );
+        taskToken.approveTaskContract(address(fixedPaymentTask), REWARD_AMOUNT * 10);
 
         vm.prank(worker);
-        taskToken.approveTaskContract(
-            address(disputeResolver),
-            ADMIN_STAKE_AMOUNT
-        );
+        taskToken.approveTaskContract(address(disputeResolver), ADMIN_STAKE_AMOUNT);
     }
 
     // 测试合约部署
     function testDeployment() public view {
         assertEq(fixedPaymentTask.owner(), owner);
         assertEq(address(fixedPaymentTask.taskToken()), address(taskToken));
-        assertEq(
-            address(fixedPaymentTask.disputeResolver()),
-            address(disputeResolver)
-        );
+        assertEq(address(fixedPaymentTask.disputeResolver()), address(disputeResolver));
     }
 
     // 测试创建任务
     function testCreateTask() public {
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         (
             uint256 id,
@@ -101,38 +94,21 @@ contract FixedPaymentTaskTest is Test {
 
         vm.prank(taskCreator);
         vm.expectRevert(BaseTask.InvalidDeadline.selector);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp - 1 hours
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp - 1 hours);
     }
 
     // 测试添加工作者
     function testAddWorker() public {
         // 先创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者并存入报酬
         vm.prank(taskCreator);
         fixedPaymentTask.addWorker(1, worker, REWARD_AMOUNT);
 
         // 检查任务状态
-        (
-            ,
-            ,
-            ,
-            ,
-            uint256 reward,
-            ,
-            BaseTask.TaskStatus status,
-
-        ) = fixedPaymentTask.tasks(1);
+        (,,,, uint256 reward,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(reward, REWARD_AMOUNT);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.InProgress));
         assertEq(fixedPaymentTask.taskWorker(1), worker);
@@ -143,21 +119,11 @@ contract FixedPaymentTaskTest is Test {
     function testAddWorkerOnlyTaskCreator() public {
         // 先创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 其他用户尝试添加工作者
         vm.prank(otherUser);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BaseTask.OnlyTaskCreator.selector,
-                otherUser,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, otherUser, 1));
         fixedPaymentTask.addWorker(1, worker, REWARD_AMOUNT);
     }
 
@@ -165,11 +131,7 @@ contract FixedPaymentTaskTest is Test {
     function testSubmitProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -180,12 +142,8 @@ contract FixedPaymentTaskTest is Test {
         fixedPaymentTask.submitProofOfWork(1, "This is my proof of work");
 
         // 验证工作量证明已提交
-        (
-            string memory proof,
-            bool submitted,
-            bool approved,
-            uint256 submittedAt
-        ) = fixedPaymentTask.taskWorkProofs(1, worker);
+        (string memory proof, bool submitted, bool approved, uint256 submittedAt) =
+            fixedPaymentTask.taskWorkProofs(1, worker);
 
         assertEq(proof, "This is my proof of work");
         assertTrue(submitted);
@@ -197,11 +155,7 @@ contract FixedPaymentTaskTest is Test {
     function testApproveProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -216,35 +170,26 @@ contract FixedPaymentTaskTest is Test {
         fixedPaymentTask.approveProofOfWork(1, worker);
 
         // 验证工作量证明已批准，任务状态已更新
-        (
-            string memory proof,
-            bool submitted,
-            bool approved,
-            uint256 submittedAt
-        ) = fixedPaymentTask.taskWorkProofs(1, worker);
+        (string memory proof, bool submitted, bool approved, uint256 submittedAt) =
+            fixedPaymentTask.taskWorkProofs(1, worker);
 
         assertEq(proof, "This is my proof of work");
         assertTrue(submitted);
         assertTrue(approved);
         assertGt(submittedAt, 0);
 
-        (, , , , , , BaseTask.TaskStatus status, ) = fixedPaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Completed));
     }
 
     // 测试支付任务
     function testPayTask() public {
         uint256 initialWorkerBalance = taskToken.balanceOf(worker);
-        uint256 initialPlatformRevenue = fixedPaymentTask
-            .totalPlatformRevenue();
+        uint256 initialPlatformRevenue = fixedPaymentTask.totalPlatformRevenue();
 
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -263,21 +208,15 @@ contract FixedPaymentTaskTest is Test {
         fixedPaymentTask.payTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = fixedPaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Paid));
 
         // 验证资金已正确分配
         uint256 platformFee = (REWARD_AMOUNT * 100) / 10000; // 1% 平台费用
         uint256 workerPayment = REWARD_AMOUNT - platformFee;
 
-        assertEq(
-            taskToken.balanceOf(worker),
-            initialWorkerBalance + workerPayment
-        );
-        assertEq(
-            fixedPaymentTask.totalPlatformRevenue(),
-            initialPlatformRevenue + platformFee
-        );
+        assertEq(taskToken.balanceOf(worker), initialWorkerBalance + workerPayment);
+        assertEq(fixedPaymentTask.totalPlatformRevenue(), initialPlatformRevenue + platformFee);
     }
 
     // 测试终止任务
@@ -286,11 +225,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -301,7 +236,7 @@ contract FixedPaymentTaskTest is Test {
         fixedPaymentTask.terminateTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = fixedPaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
 
         // 验证资金已退还给任务创建者
@@ -315,11 +250,7 @@ contract FixedPaymentTaskTest is Test {
     function testSubmitProofOfWorkDeadlinePassed() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 hours
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 hours);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -330,9 +261,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 工作者尝试提交工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_TaskDeadlinePassed.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_TaskDeadlinePassed.selector);
         fixedPaymentTask.submitProofOfWork(1, "This is my proof of work");
     }
 
@@ -340,11 +269,7 @@ contract FixedPaymentTaskTest is Test {
     function testSubmitProofOfWorkEmpty() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -352,9 +277,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 工作者尝试提交空的工作量证明应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_ProofOfWorkEmpty.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_ProofOfWorkEmpty.selector);
         fixedPaymentTask.submitProofOfWork(1, "");
     }
 
@@ -362,11 +285,7 @@ contract FixedPaymentTaskTest is Test {
     function testSubmitProofOfWorkOnlyWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -374,9 +293,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 其他用户尝试提交工作量证明应该失败
         vm.prank(otherUser);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_OnlyWorkerCanSubmitProof.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_OnlyWorkerCanSubmitProof.selector);
         fixedPaymentTask.submitProofOfWork(1, "This is my proof of work");
     }
 
@@ -384,11 +301,7 @@ contract FixedPaymentTaskTest is Test {
     function testApproveProofOfWorkNotSubmitted() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -396,9 +309,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 任务创建者尝试验证未提交的工作量证明应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_ProofNotSubmitted.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_ProofNotSubmitted.selector);
         fixedPaymentTask.approveProofOfWork(1, worker);
     }
 
@@ -406,11 +317,7 @@ contract FixedPaymentTaskTest is Test {
     function testPayTaskNotCompleted() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -418,9 +325,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 工作者尝试支付未完成的任务应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_TaskNotCompleted.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_TaskNotCompleted.selector);
         fixedPaymentTask.payTask(1);
     }
 
@@ -428,17 +333,11 @@ contract FixedPaymentTaskTest is Test {
     function testAddWorkerInvalidAddress() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 尝试添加零地址工作者应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_InvalidWorkerAddress.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_InvalidWorkerAddress.selector);
         fixedPaymentTask.addWorker(1, address(0), REWARD_AMOUNT);
     }
 
@@ -446,11 +345,7 @@ contract FixedPaymentTaskTest is Test {
     function testAddWorkerNotOpen() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -466,12 +361,7 @@ contract FixedPaymentTaskTest is Test {
         address anotherWorker = address(0x4);
         // 尝试向已完成的任务添加另一个工作者应该失败
         vm.prank(taskCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FixedPaymentTask.FixedPaymentTask_TaskNotOpen.selector,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FixedPaymentTask.FixedPaymentTask_TaskNotOpen.selector, 1));
         fixedPaymentTask.addWorker(1, anotherWorker, REWARD_AMOUNT);
     }
 
@@ -479,11 +369,7 @@ contract FixedPaymentTaskTest is Test {
     function testFileDisputeByWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -508,11 +394,7 @@ contract FixedPaymentTaskTest is Test {
     function testFileDisputeByWorkerNoProof() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -520,9 +402,7 @@ contract FixedPaymentTaskTest is Test {
 
         // 工作者未提交工作量证明就尝试提交纠纷应该失败
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_NoProofOfWorkSubmitted.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_NoProofOfWorkSubmitted.selector);
         fixedPaymentTask.fileDisputeByWorker(1);
     }
 
@@ -530,11 +410,7 @@ contract FixedPaymentTaskTest is Test {
     function testFileDisputeByWorkerAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -554,9 +430,7 @@ contract FixedPaymentTaskTest is Test {
         // 工作者尝试对已批准的工作量证明提交纠纷应该失败
         // 由于任务状态已经不是InProgress，所以会触发TaskNotInProgress错误
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_TaskNotInProgress.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_TaskNotInProgress.selector);
         fixedPaymentTask.fileDisputeByWorker(1);
     }
 
@@ -564,11 +438,7 @@ contract FixedPaymentTaskTest is Test {
     function testFileDisputeByWorkerTimeNotReached() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -580,21 +450,15 @@ contract FixedPaymentTaskTest is Test {
 
         // 未推进足够时间就尝试提交纠纷应该失败 (需要至少3天)
         vm.prank(worker);
-        vm.expectRevert(
-            FixedPaymentTask.FixedPaymentTask_DisputeTimeNotReached.selector
-        );
+        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_DisputeTimeNotReached.selector);
         fixedPaymentTask.fileDisputeByWorker(1);
     }
-    
+
     // 测试提交已批准的工作量证明
     function testSubmitProofOfWorkAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -613,92 +477,52 @@ contract FixedPaymentTaskTest is Test {
         vm.expectRevert(FixedPaymentTask.FixedPaymentTask_TaskNotInProgress.selector);
         fixedPaymentTask.submitProofOfWork(1, "This is another proof of work");
     }
-    
+
     // 测试terminateTask中worker != address(0)条件为false的情况
     function testTerminateTaskWithZeroWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
-        
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
+
         // 任务创建者终止任务，此时没有分配工作者
         vm.prank(taskCreator);
         fixedPaymentTask.terminateTask(1);
-        
+
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = fixedPaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
-    
+
     // 测试terminateTask中proof.submitted为false的情况
     function testTerminateTaskWithoutProofSubmitted() public {
         uint256 initialCreatorBalance = taskToken.balanceOf(taskCreator);
-        
+
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
         fixedPaymentTask.addWorker(1, worker, REWARD_AMOUNT);
-        
+
         // 此时工作者尚未提交工作量证明，任务创建者终止任务
         vm.prank(taskCreator);
         fixedPaymentTask.terminateTask(1);
-        
+
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = fixedPaymentTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = fixedPaymentTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
-        
+
         // 验证资金已退还给任务创建者
         assertEq(taskToken.balanceOf(taskCreator), initialCreatorBalance);
         assertEq(taskToken.balanceOf(address(fixedPaymentTask)), 0);
     }
-    
-    // 测试terminateTask中proof.approved为true的情况
-    function testTerminateTaskWithApprovedProof() public {
-        // 创建任务
-        vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
 
-        // 添加工作者
-        vm.prank(taskCreator);
-        fixedPaymentTask.addWorker(1, worker, REWARD_AMOUNT);
-
-        // 工作者提交工作量证明
-        vm.prank(worker);
-        fixedPaymentTask.submitProofOfWork(1, "This is my proof of work");
-
-        // 任务创建者验证工作量证明
-        vm.prank(taskCreator);
-        fixedPaymentTask.approveProofOfWork(1, worker);
-        
-        // 任务创建者尝试终止已完成的任务应该失败
-        vm.prank(taskCreator);
-        vm.expectRevert(FixedPaymentTask.FixedPaymentTask_TaskCannotBeCancelled.selector);
-        fixedPaymentTask.terminateTask(1);
-    }
-    
     // 测试approveProofOfWork工作者地址不匹配的情况
     function testApproveProofOfWorkNoWorkerAssigned() public {
         // 创建任务
         vm.prank(taskCreator);
-        fixedPaymentTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        fixedPaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 添加工作者
         vm.prank(taskCreator);
@@ -707,7 +531,7 @@ contract FixedPaymentTaskTest is Test {
         // 工作者提交工作量证明
         vm.prank(worker);
         fixedPaymentTask.submitProofOfWork(1, "This is my proof of work");
-        
+
         // 任务创建者尝试用错误的工作者地址验证工作量证明应该失败
         address wrongWorker = address(0x4);
         vm.prank(taskCreator);

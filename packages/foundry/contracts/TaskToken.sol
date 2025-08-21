@@ -13,17 +13,19 @@ contract TaskToken is ERC20, Ownable {
     // 代币精度
     uint8 private immutable _decimals;
 
+    // 水龙头铸造数量
+    uint256 public constant FAUCET_MINT_AMOUNT = 10000 * 10 ** 18;
+
     /**
      * @notice 构造函数
      * @param _name 代币名称
      * @param _symbol 代币符号
      * @param decimals_ 代币精度
      */
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        uint8 decimals_
-    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+    constructor(string memory _name, string memory _symbol, uint8 decimals_)
+        ERC20(_name, _symbol)
+        Ownable(msg.sender)
+    {
         _decimals = decimals_;
     }
 
@@ -36,7 +38,7 @@ contract TaskToken is ERC20, Ownable {
     }
 
     /**
-     * @notice 铸造代币
+     * @notice 铸造代币 - 只有所有者可以铸造
      * @param to 接收地址
      * @param amount 铸造数量
      */
@@ -45,10 +47,17 @@ contract TaskToken is ERC20, Ownable {
     }
 
     /**
+     * @notice 水龙头功能 - 任何人都可以铸造固定数量的代币给自己
+     */
+    function faucetMint() external {
+        _mint(msg.sender, FAUCET_MINT_AMOUNT);
+    }
+
+    /**
      * @notice 销毁代币
      * @param amount 销毁数量
      */
-    function burn(uint256 amount) public {
+    function burn(uint256 amount) external {
         _burn(msg.sender, amount);
     }
 
@@ -57,10 +66,7 @@ contract TaskToken is ERC20, Ownable {
      * @param taskContract 任务合约地址
      * @param amount 授权数量
      */
-    function approveTaskContract(
-        address taskContract,
-        uint256 amount
-    ) external {
+    function approveTaskContract(address taskContract, uint256 amount) external {
         _approve(msg.sender, taskContract, amount);
     }
 }

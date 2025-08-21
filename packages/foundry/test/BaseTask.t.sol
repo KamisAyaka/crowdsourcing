@@ -5,19 +5,14 @@ import "forge-std/Test.sol";
 import "../contracts/BaseTask.sol";
 import "../contracts/TaskToken.sol";
 import "../contracts/DisputeResolver.sol";
+import "../contracts/UserInfo.sol";
+import "../contracts/interface/IDisputeResolver.sol";
 
 // 创建一个简单的实现合约来测试BaseTask的抽象功能
 contract TestBaseTask is BaseTask {
-    constructor(
-        IERC20 _taskToken,
-        DisputeResolver _disputeResolver
-    ) BaseTask(_taskToken, _disputeResolver) {}
+    constructor(IERC20 _taskToken, IDisputeResolver _disputeResolver) BaseTask(_taskToken, _disputeResolver) { }
 
-    function createTask(
-        string memory _title,
-        string memory _description,
-        uint256 _deadline
-    ) public override {
+    function createTask(string memory _title, string memory _description, uint256 _deadline) public override {
         taskCounter++;
         Task storage newTask = tasks[taskCounter];
         newTask.id = taskCounter;
@@ -34,11 +29,7 @@ contract TestBaseTask is BaseTask {
         task.status = TaskStatus.Cancelled;
     }
 
-    function addWorker(
-        uint256 _taskId,
-        address _worker,
-        uint256 _reward
-    ) public override {
+    function addWorker(uint256 _taskId, address _worker, uint256 _reward) public override {
         // 简单实现
     }
 }
@@ -47,6 +38,7 @@ contract BaseTaskTest is Test {
     TestBaseTask public baseTask;
     TaskToken public taskToken;
     DisputeResolver public disputeResolver;
+    UserInfo public userInfo;
 
     address public owner;
     address public taskCreator;
@@ -69,8 +61,11 @@ contract BaseTaskTest is Test {
         // 部署DisputeResolver合约
         disputeResolver = new DisputeResolver(taskToken);
 
+        // 部署UserInfo合约
+        userInfo = new UserInfo();
+
         // 部署BaseTask合约
-        baseTask = new TestBaseTask(taskToken, disputeResolver);
+        baseTask = new TestBaseTask(taskToken, IDisputeResolver(address(disputeResolver)));
     }
 
     // 测试合约部署
@@ -84,11 +79,7 @@ contract BaseTaskTest is Test {
     // 测试创建任务
     function testCreateTask() public {
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         (
             uint256 id,
@@ -165,7 +156,7 @@ contract BaseTaskTest is Test {
         // 设置一些平台收入
         vm.prank(owner);
         baseTask.updatePlatformFee(100); // 1%
-        
+
         // 由于BaseTask是抽象合约，我们无法直接测试完整的收入流程
         // 这里只是验证函数的基本逻辑
         vm.expectRevert(BaseTask.NoRevenueToWithdraw.selector);
@@ -177,17 +168,13 @@ contract BaseTaskTest is Test {
     function testChangeDeadline() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 任务创建者修改截止时间
         vm.prank(taskCreator);
         baseTask.changedeadline(1, block.timestamp + 2 days);
 
-        (, , , , , uint256 newDeadline, , ) = baseTask.tasks(1);
+        (,,,,, uint256 newDeadline,,) = baseTask.tasks(1);
         assertEq(newDeadline, block.timestamp + 2 days);
     }
 
@@ -195,11 +182,7 @@ contract BaseTaskTest is Test {
     function testChangeDeadlineInvalid() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 尝试将截止时间修改为更早的时间应该失败
         vm.prank(taskCreator);
@@ -211,18 +194,12 @@ contract BaseTaskTest is Test {
     function testChangeDeadlineOnlyTaskCreator() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 非任务创建者尝试修改截止时间应该失败
         address notCreator = address(0x3);
         vm.prank(notCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, notCreator, 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, notCreator, 1));
         baseTask.changedeadline(1, block.timestamp + 2 days);
     }
 
@@ -230,39 +207,28 @@ contract BaseTaskTest is Test {
     function testIncreaseReward() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         uint256 initialBalance = taskToken.balanceOf(address(baseTask));
-        
+
         // 授权
         vm.prank(taskCreator);
-        taskToken.approveTaskContract(address(baseTask), REWARD_AMOUNT);
+        taskToken.approve(address(baseTask), REWARD_AMOUNT);
 
         // 任务创建者增加奖励
         vm.prank(taskCreator);
         baseTask.increaseReward(1, REWARD_AMOUNT);
 
-        (, , , , uint256 newReward, , , ) = baseTask.tasks(1);
+        (,,,, uint256 newReward,,,) = baseTask.tasks(1);
         assertEq(newReward, REWARD_AMOUNT);
-        assertEq(
-            taskToken.balanceOf(address(baseTask)),
-            initialBalance + REWARD_AMOUNT
-        );
+        assertEq(taskToken.balanceOf(address(baseTask)), initialBalance + REWARD_AMOUNT);
     }
 
     // 测试增加奖励为0
     function testIncreaseRewardZero() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 尝试增加0奖励应该失败
         vm.prank(taskCreator);
@@ -274,18 +240,12 @@ contract BaseTaskTest is Test {
     function testIncreaseRewardOnlyTaskCreator() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         // 非任务创建者尝试增加奖励应该失败
         address notCreator = address(0x3);
         vm.prank(notCreator);
-        vm.expectRevert(
-            abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, notCreator, 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, notCreator, 1));
         baseTask.increaseReward(1, REWARD_AMOUNT);
     }
 
@@ -293,14 +253,10 @@ contract BaseTaskTest is Test {
     function testGetTask() public {
         // 创建任务
         vm.prank(taskCreator);
-        baseTask.createTask(
-            "Test Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        baseTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
 
         BaseTask.Task memory task = baseTask.getTask(1);
-        
+
         assertEq(task.id, 1);
         assertEq(task.creator, taskCreator);
         assertEq(task.title, "Test Task");

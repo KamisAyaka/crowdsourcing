@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "./DeployHelpers.s.sol";
 import "../contracts/TaskToken.sol";
 import "../contracts/DisputeResolver.sol";
+import "../contracts/UserInfo.sol";
 import "../contracts/task/FixedPaymentTask.sol";
 import "../contracts/task/BiddingTask.sol";
 import "../contracts/task/MilestonePaymentTask.sol";
@@ -32,28 +33,34 @@ contract DeployYourContract is ScaffoldETHDeploy {
         // Deploy TaskToken contract
         TaskToken taskToken = new TaskToken("Task Token", "TASK", 18);
         console.log("TaskToken deployed to:", address(taskToken));
-        
+
         // Deploy DisputeResolver contract
         DisputeResolver disputeResolver = new DisputeResolver(taskToken);
         console.log("DisputeResolver deployed to:", address(disputeResolver));
-        
+
+        // Deploy UserInfo contract
+        UserInfo userInfo = new UserInfo();
+        console.log("UserInfo deployed to:", address(userInfo));
+
         // Deploy FixedPaymentTask contract
-        FixedPaymentTask fixedPaymentTask = new FixedPaymentTask(taskToken, disputeResolver);
+        FixedPaymentTask fixedPaymentTask = new FixedPaymentTask(taskToken, IDisputeResolver(address(disputeResolver)));
         console.log("FixedPaymentTask deployed to:", address(fixedPaymentTask));
-        
+
         // Deploy BiddingTask contract
-        BiddingTask biddingTask = new BiddingTask(taskToken, disputeResolver);
+        BiddingTask biddingTask = new BiddingTask(taskToken, IDisputeResolver(address(disputeResolver)));
         console.log("BiddingTask deployed to:", address(biddingTask));
-        
+
         // Deploy MilestonePaymentTask contract
-        MilestonePaymentTask milestonePaymentTask = new MilestonePaymentTask(taskToken, disputeResolver);
+        MilestonePaymentTask milestonePaymentTask =
+            new MilestonePaymentTask(taskToken, IDisputeResolver(address(disputeResolver)));
         console.log("MilestonePaymentTask deployed to:", address(milestonePaymentTask));
-        
+
         // Output deployment information
         console.log("=====================================");
         console.log("All contracts deployed successfully:");
         console.log("- TaskToken: ", address(taskToken));
         console.log("- DisputeResolver: ", address(disputeResolver));
+        console.log("- UserInfo: ", address(userInfo));
         console.log("- FixedPaymentTask: ", address(fixedPaymentTask));
         console.log("- BiddingTask: ", address(biddingTask));
         console.log("- MilestonePaymentTask: ", address(milestonePaymentTask));

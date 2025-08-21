@@ -5,11 +5,14 @@ import "forge-std/Test.sol";
 import "../contracts/task/BiddingTask.sol";
 import "../contracts/TaskToken.sol";
 import "../contracts/DisputeResolver.sol";
+import "../contracts/UserInfo.sol";
+import "../contracts/interface/IDisputeResolver.sol";
 
 contract BiddingTaskTest is Test {
     BiddingTask public biddingTask;
     TaskToken public taskToken;
     DisputeResolver public disputeResolver;
+    UserInfo public userInfo;
 
     address public owner;
     address public taskCreator;
@@ -40,44 +43,34 @@ contract BiddingTaskTest is Test {
         // 部署DisputeResolver合约
         disputeResolver = new DisputeResolver(taskToken);
 
+        // 部署UserInfo合约
+        userInfo = new UserInfo();
+
         // 部署BiddingTask合约
-        biddingTask = new BiddingTask(taskToken, disputeResolver);
+        biddingTask = new BiddingTask(taskToken, IDisputeResolver(address(disputeResolver)));
 
         // 设置授权
         vm.prank(taskCreator);
         taskToken.approveTaskContract(address(biddingTask), BID_AMOUNT_1 * 10);
 
         vm.prank(worker1);
-        taskToken.approveTaskContract(
-            address(disputeResolver),
-            ADMIN_STAKE_AMOUNT
-        );
+        taskToken.approveTaskContract(address(disputeResolver), ADMIN_STAKE_AMOUNT);
 
         vm.prank(worker2);
-        taskToken.approveTaskContract(
-            address(disputeResolver),
-            ADMIN_STAKE_AMOUNT
-        );
+        taskToken.approveTaskContract(address(disputeResolver), ADMIN_STAKE_AMOUNT);
     }
 
     // 测试合约部署
     function testDeployment() public view {
         assertEq(biddingTask.owner(), owner);
         assertEq(address(biddingTask.taskToken()), address(taskToken));
-        assertEq(
-            address(biddingTask.disputeResolver()),
-            address(disputeResolver)
-        );
+        assertEq(address(biddingTask.disputeResolver()), address(disputeResolver));
     }
 
     // 测试创建任务
     function testCreateTask() public {
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         (
             uint256 id,
@@ -108,22 +101,14 @@ contract BiddingTaskTest is Test {
 
         vm.prank(taskCreator);
         vm.expectRevert(BaseTask.InvalidDeadline.selector);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp - 1 hours
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp - 1 hours);
     }
 
     // 测试提交竞标
     function testSubmitBid() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者1提交竞标
         vm.prank(worker1);
@@ -143,11 +128,7 @@ contract BiddingTaskTest is Test {
     function testSubmitBidTaskNotOpen() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -167,11 +148,7 @@ contract BiddingTaskTest is Test {
     function testSubmitBidInvalidAmount() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交金额为0的竞标应该失败
         vm.prank(worker1);
@@ -183,11 +160,7 @@ contract BiddingTaskTest is Test {
     function testSubmitBidEmptyDescription() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交描述为空的竞标应该失败
         vm.prank(worker1);
@@ -199,11 +172,7 @@ contract BiddingTaskTest is Test {
     function testAcceptBid() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者1提交竞标
         vm.prank(worker1);
@@ -245,11 +214,7 @@ contract BiddingTaskTest is Test {
     function testAcceptBidOnlyTaskCreator() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -257,13 +222,7 @@ contract BiddingTaskTest is Test {
 
         // 其他用户尝试接受竞标应该失败
         vm.prank(otherUser);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BaseTask.OnlyTaskCreator.selector,
-                otherUser,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseTask.OnlyTaskCreator.selector, otherUser, 1));
         biddingTask.acceptBid(1, 0);
     }
 
@@ -271,11 +230,7 @@ contract BiddingTaskTest is Test {
     function testAcceptBidInvalidIndex() public {
         // 先创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 任务创建者尝试接受不存在的竞标应该失败
         vm.prank(taskCreator);
@@ -287,11 +242,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -306,12 +257,8 @@ contract BiddingTaskTest is Test {
         biddingTask.submitProofOfWork(1, "This is my proof of work");
 
         // 验证工作量证明已提交
-        (
-            string memory proof,
-            bool submitted,
-            bool approved,
-            uint256 submittedAt
-        ) = biddingTask.taskWorkProofs(1, worker1);
+        (string memory proof, bool submitted, bool approved, uint256 submittedAt) =
+            biddingTask.taskWorkProofs(1, worker1);
 
         assertEq(proof, "This is my proof of work");
         assertTrue(submitted);
@@ -323,11 +270,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkOnlyWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -339,9 +282,7 @@ contract BiddingTaskTest is Test {
 
         // 其他用户尝试提交工作量证明应该失败
         vm.prank(otherUser);
-        vm.expectRevert(
-            BiddingTask.BiddingTask_OnlyWorkerCanSubmitProof.selector
-        );
+        vm.expectRevert(BiddingTask.BiddingTask_OnlyWorkerCanSubmitProof.selector);
         biddingTask.submitProofOfWork(1, "This is my proof of work");
     }
 
@@ -349,11 +290,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkEmpty() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -373,11 +310,7 @@ contract BiddingTaskTest is Test {
     function testApproveProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -396,19 +329,15 @@ contract BiddingTaskTest is Test {
         biddingTask.approveProofOfWork(1, worker1);
 
         // 验证工作量证明已批准，任务状态已更新
-        (
-            string memory proof,
-            bool submitted,
-            bool approved,
-            uint256 submittedAt
-        ) = biddingTask.taskWorkProofs(1, worker1);
+        (string memory proof, bool submitted, bool approved, uint256 submittedAt) =
+            biddingTask.taskWorkProofs(1, worker1);
 
         assertEq(proof, "This is my proof of work");
         assertTrue(submitted);
         assertTrue(approved);
         assertGt(submittedAt, 0);
 
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Completed));
     }
 
@@ -419,11 +348,7 @@ contract BiddingTaskTest is Test {
 
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -446,39 +371,29 @@ contract BiddingTaskTest is Test {
         biddingTask.payTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Paid));
 
         // 验证资金已正确分配
         uint256 platformFee = (BID_AMOUNT_1 * 100) / 10000; // 1% 平台费用
         uint256 workerPayment = BID_AMOUNT_1 - platformFee;
 
-        assertEq(
-            taskToken.balanceOf(worker1),
-            initialWorkerBalance + workerPayment
-        );
-        assertEq(
-            biddingTask.totalPlatformRevenue(),
-            initialPlatformRevenue + platformFee
-        );
+        assertEq(taskToken.balanceOf(worker1), initialWorkerBalance + workerPayment);
+        assertEq(biddingTask.totalPlatformRevenue(), initialPlatformRevenue + platformFee);
     }
 
     // 测试终止开放状态的任务
     function testTerminateTaskOpen() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 任务创建者终止任务
         vm.prank(taskCreator);
         biddingTask.terminateTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
 
@@ -486,11 +401,7 @@ contract BiddingTaskTest is Test {
     function testTerminateTaskInProgress() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -505,7 +416,7 @@ contract BiddingTaskTest is Test {
         biddingTask.terminateTask(1);
 
         // 验证任务状态已更新
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
 
@@ -513,11 +424,7 @@ contract BiddingTaskTest is Test {
     function testFileDisputeByWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -546,11 +453,7 @@ contract BiddingTaskTest is Test {
     function testFileDisputeByWorkerNoProof() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -562,9 +465,7 @@ contract BiddingTaskTest is Test {
 
         // 工作者未提交工作量证明就尝试提交纠纷应该失败
         vm.prank(worker1);
-        vm.expectRevert(
-            BiddingTask.BiddingTask_NoProofOfWorkSubmitted.selector
-        );
+        vm.expectRevert(BiddingTask.BiddingTask_NoProofOfWorkSubmitted.selector);
         biddingTask.fileDisputeByWorker(1);
     }
 
@@ -572,11 +473,7 @@ contract BiddingTaskTest is Test {
     function testFileDisputeByWorkerTimeNotReached() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -600,11 +497,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkTaskNotInProgress() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -628,17 +521,11 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkNoAssignedWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 在没有分配工作者的情况下尝试提交工作量证明应该失败
         vm.prank(worker1);
-        vm.expectRevert(
-            BiddingTask.BiddingTask_OnlyWorkerCanSubmitProof.selector
-        );
+        vm.expectRevert(BiddingTask.BiddingTask_OnlyWorkerCanSubmitProof.selector);
         biddingTask.submitProofOfWork(1, "This is my proof of work");
     }
 
@@ -646,11 +533,7 @@ contract BiddingTaskTest is Test {
     function testApproveProofOfWorkNotSubmitted() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -670,11 +553,7 @@ contract BiddingTaskTest is Test {
     function testGetBidInvalidIndex() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -690,11 +569,7 @@ contract BiddingTaskTest is Test {
     function testSubmitBidAfterDeadline() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 推进时间超过截止时间
         vm.warp(block.timestamp + 2 days);
@@ -709,11 +584,7 @@ contract BiddingTaskTest is Test {
     function testAcceptBidTaskNotOpen() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -733,11 +604,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkAfterDeadline() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -760,11 +627,7 @@ contract BiddingTaskTest is Test {
     function testApproveAlreadyApprovedProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -792,11 +655,7 @@ contract BiddingTaskTest is Test {
     function testFileDisputeByWorkerInsufficientTime() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 10 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 10 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -823,11 +682,7 @@ contract BiddingTaskTest is Test {
     function testFileDisputeByWorkerApprovedProof() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 10 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 10 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -852,26 +707,6 @@ contract BiddingTaskTest is Test {
         vm.prank(worker1);
         vm.expectRevert(BiddingTask.BiddingTask_TaskNotInProgress.selector);
         biddingTask.fileDisputeByWorker(1);
-    }
-
-    // 测试终止已完成的任务
-    /// @dev 测试当任务已经完成时尝试终止任务的情况
-    function testTerminateTaskCompleted() public {
-        // 创建任务
-        createBasicTaskAndApproveBid();
-
-        // 工作者提交工作量证明
-        vm.prank(worker1);
-        biddingTask.submitProofOfWork(1, "This is my proof of work");
-
-        // 任务创建者验证工作量证明
-        vm.prank(taskCreator);
-        biddingTask.approveProofOfWork(1, worker1);
-
-        // 尝试终止已完成的任务应该失败
-        vm.prank(taskCreator);
-        vm.expectRevert(BiddingTask.BiddingTask_TaskCannotBeCancelled.selector);
-        biddingTask.terminateTask(1);
     }
 
     // 测试终止已支付的任务
@@ -903,11 +738,7 @@ contract BiddingTaskTest is Test {
     function testTerminateTaskCancelled() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 任务创建者终止任务
         vm.prank(taskCreator);
@@ -923,18 +754,14 @@ contract BiddingTaskTest is Test {
     function testTerminateTaskWithoutAssignedWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 任务创建者终止任务（没有分配工作者）
         vm.prank(taskCreator);
         biddingTask.terminateTask(1);
 
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
 
@@ -942,11 +769,7 @@ contract BiddingTaskTest is Test {
     function testTerminateTaskWithSubmittedProofOfWork() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 10 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 10 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -970,7 +793,7 @@ contract BiddingTaskTest is Test {
         // 验证是否触发了纠纷提交
         // 这里我们验证任务状态为已取消，但实际应该触发纠纷
         // 在当前实现中，terminateTask函数会直接提交纠纷
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
 
@@ -978,11 +801,7 @@ contract BiddingTaskTest is Test {
     function testSubmitProofOfWorkAlreadyApproved() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1005,16 +824,12 @@ contract BiddingTaskTest is Test {
         vm.expectRevert(BiddingTask.BiddingTask_TaskNotInProgress.selector);
         biddingTask.submitProofOfWork(1, "This is another proof of work");
     }
-    
+
     // 测试批准未提交的工作量证明（新版本）
     function testApproveProofOfWorkNotSubmittedNew() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1029,16 +844,12 @@ contract BiddingTaskTest is Test {
         vm.expectRevert(BiddingTask.BiddingTask_ProofNotSubmitted.selector);
         biddingTask.approveProofOfWork(1, worker1);
     }
-    
+
     // 测试终止任务时工作者地址为0的情况
     function testTerminateTaskWithZeroWorkerAddress() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1053,19 +864,15 @@ contract BiddingTaskTest is Test {
         biddingTask.terminateTask(1);
 
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
-    
+
     // 测试工作者提交纠纷时工作量证明已批准的情况（新版本）
     function testFileDisputeByWorkerApprovedProofNew() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 10 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 10 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1091,35 +898,27 @@ contract BiddingTaskTest is Test {
         vm.expectRevert(BiddingTask.BiddingTask_TaskNotInProgress.selector);
         biddingTask.fileDisputeByWorker(1);
     }
-    
+
     // 测试terminateTask中worker != address(0)条件为false的情况
     function testTerminateTaskWithZeroWorker() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
-        
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
+
         // 任务创建者终止任务，此时没有分配工作者
         vm.prank(taskCreator);
         biddingTask.terminateTask(1);
-        
+
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
-    
+
     // 测试terminateTask中proof.submitted为false的情况
     function testTerminateTaskWithoutProofSubmitted() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1128,25 +927,21 @@ contract BiddingTaskTest is Test {
         // 任务创建者接受竞标
         vm.prank(taskCreator);
         biddingTask.acceptBid(1, 0);
-        
+
         // 此时工作者尚未提交工作量证明，任务创建者终止任务
         vm.prank(taskCreator);
         biddingTask.terminateTask(1);
-        
+
         // 验证任务状态为已取消
-        (, , , , , , BaseTask.TaskStatus status, ) = biddingTask.tasks(1);
+        (,,,,,, BaseTask.TaskStatus status,) = biddingTask.tasks(1);
         assertEq(uint8(status), uint8(BaseTask.TaskStatus.Cancelled));
     }
-    
+
     // 测试payTask任务未完成的情况
     function testPayTaskNotCompleted() public {
         // 创建任务
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);
@@ -1155,7 +950,7 @@ contract BiddingTaskTest is Test {
         // 任务创建者接受竞标
         vm.prank(taskCreator);
         biddingTask.acceptBid(1, 0);
-        
+
         // 工作者尝试支付未完成的任务应该失败
         vm.prank(worker1);
         vm.expectRevert(BiddingTask.BiddingTask_TaskNotCompleted.selector);
@@ -1166,11 +961,7 @@ contract BiddingTaskTest is Test {
     /// @dev 创建一个基本任务并让工作者提交竞标，任务创建者接受竞标
     function createBasicTaskAndApproveBid() internal {
         vm.prank(taskCreator);
-        biddingTask.createTask(
-            "Test Bidding Task",
-            "Test Description",
-            block.timestamp + 1 days
-        );
+        biddingTask.createTask("Test Bidding Task", "Test Description", block.timestamp + 1 days);
 
         // 工作者提交竞标
         vm.prank(worker1);

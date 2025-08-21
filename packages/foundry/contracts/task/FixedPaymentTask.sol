@@ -34,40 +34,15 @@ contract FixedPaymentTask is BaseTask {
     error FixedPaymentTask_DisputeTimeNotReached();
 
     // 自定义事件
-    event FixedPaymentTask_TaskWorkerAdded(
-        uint256 indexed taskId,
-        address indexed worker
-    );
-    event FixedPaymentTask_TaskWorkerRemoved(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event FixedPaymentTask_TaskWorkerAdded(uint256 indexed taskId, address indexed worker);
+    event FixedPaymentTask_TaskWorkerRemoved(uint256 indexed taskId, address indexed worker);
     event FixedPaymentTask_TaskCancelled(uint256 indexed taskId);
-    event FixedPaymentTask_TaskPaid(
-        uint256 indexed taskId,
-        uint256 amount,
-        uint256 platformFee
-    );
-    event FixedPaymentTask_ProofOfWorkSubmitted(
-        uint256 indexed taskId,
-        address indexed worker,
-        string proof
-    );
-    event FixedPaymentTask_ProofOfWorkApproved(
-        uint256 indexed taskId,
-        address indexed worker
-    );
-    event FixedPaymentTask_DisputeFiledByWorker(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event FixedPaymentTask_TaskPaid(uint256 indexed taskId, uint256 amount, uint256 platformFee);
+    event FixedPaymentTask_ProofOfWorkSubmitted(uint256 indexed taskId, address indexed worker, string proof);
+    event FixedPaymentTask_ProofOfWorkApproved(uint256 indexed taskId, address indexed worker);
+    event FixedPaymentTask_DisputeFiledByWorker(uint256 indexed taskId, address indexed worker);
 
-    event FixedPaymentTaskCreated(
-        uint256 indexed taskId,
-        address indexed creator,
-        string title,
-        uint256 deadline
-    );
+    event FixedPaymentTaskCreated(uint256 indexed taskId, address indexed creator, string title, uint256 deadline);
 
     /**
      * @notice modifier，检查调用者是否为任务的工作者
@@ -99,10 +74,7 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskToken 平台代币地址
      * @param _disputeResolver 纠纷解决合约地址
      */
-    constructor(
-        IERC20 _taskToken,
-        DisputeResolver _disputeResolver
-    ) BaseTask(_taskToken, _disputeResolver) {}
+    constructor(IERC20 _taskToken, IDisputeResolver _disputeResolver) BaseTask(_taskToken, _disputeResolver) { }
 
     /**
      * @notice 创建固定报酬任务
@@ -110,11 +82,11 @@ contract FixedPaymentTask is BaseTask {
      * @param _description 任务描述
      * @param _deadline 任务截止时间
      */
-    function createTask(
-        string memory _title,
-        string memory _description,
-        uint256 _deadline
-    ) public override whenNotPaused {
+    function createTask(string memory _title, string memory _description, uint256 _deadline)
+        public
+        override
+        whenNotPaused
+    {
         if (_deadline < block.timestamp) {
             revert InvalidDeadline();
         }
@@ -131,12 +103,7 @@ contract FixedPaymentTask is BaseTask {
         newTask.status = TaskStatus.Open;
         newTask.createdAt = block.timestamp;
 
-        emit FixedPaymentTaskCreated(
-            taskCounter,
-            msg.sender,
-            _title,
-            _deadline
-        );
+        emit FixedPaymentTaskCreated(taskCounter, msg.sender, _title, _deadline);
     }
 
     /**
@@ -144,11 +111,12 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      */
-    function addWorker(
-        uint256 _taskId,
-        address _worker,
-        uint256 _reward
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function addWorker(uint256 _taskId, address _worker, uint256 _reward)
+        public
+        override
+        onlyTaskCreator(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
 
         if (task.status != TaskStatus.Open) {
@@ -178,16 +146,11 @@ contract FixedPaymentTask is BaseTask {
      * @notice 终止任务，直接取消任务
      * @param _taskId 任务ID
      */
-    function terminateTask(
-        uint256 _taskId
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function terminateTask(uint256 _taskId) public override onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务状态是否允许终止
-        if (
-            task.status != TaskStatus.Open &&
-            task.status != TaskStatus.InProgress
-        ) {
+        if (task.status == TaskStatus.Cancelled || task.status == TaskStatus.Paid) {
             revert FixedPaymentTask_TaskCannotBeCancelled();
         }
 
@@ -201,13 +164,7 @@ contract FixedPaymentTask is BaseTask {
         if (worker != address(0) && proof.submitted && !proof.approved) {
             // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
             // 资金将在纠纷解决时分配，这里不需要进行补偿
-            submitDispute(
-                _taskId,
-                worker,
-                task.creator,
-                task.totalreward,
-                proof.proof
-            );
+            submitDispute(_taskId, worker, task.creator, task.totalreward, proof.proof);
         } else if (task.totalreward > 0) {
             taskToken.safeTransfer(task.creator, task.totalreward);
             task.totalreward = 0;
@@ -221,10 +178,7 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _proof 工作量证明内容
      */
-    function submitProofOfWork(
-        uint256 _taskId,
-        string memory _proof
-    )
+    function submitProofOfWork(uint256 _taskId, string memory _proof)
         external
         whenNotPaused
         onlyTaskWorker(_taskId)
@@ -243,12 +197,8 @@ contract FixedPaymentTask is BaseTask {
             revert FixedPaymentTask_ProofAlreadyApproved();
         }
 
-        taskWorkProofs[_taskId][msg.sender] = ProofOfWork({
-            proof: _proof,
-            submitted: true,
-            approved: false,
-            submittedAt: block.timestamp
-        });
+        taskWorkProofs[_taskId][msg.sender] =
+            ProofOfWork({ proof: _proof, submitted: true, approved: false, submittedAt: block.timestamp });
 
         emit FixedPaymentTask_ProofOfWorkSubmitted(_taskId, msg.sender, _proof);
     }
@@ -258,10 +208,7 @@ contract FixedPaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      */
-    function approveProofOfWork(
-        uint256 _taskId,
-        address _worker
-    )
+    function approveProofOfWork(uint256 _taskId, address _worker)
         external
         onlyTaskCreator(_taskId)
         whenNotPaused
@@ -288,9 +235,7 @@ contract FixedPaymentTask is BaseTask {
      * @notice 支付任务奖励
      * @param _taskId 任务ID
      */
-    function payTask(
-        uint256 _taskId
-    ) external onlyTaskWorker(_taskId) whenNotPaused {
+    function payTask(uint256 _taskId) external onlyTaskWorker(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否可以支付
@@ -322,9 +267,7 @@ contract FixedPaymentTask is BaseTask {
      * @dev 只有在工作证明已提交但未被批准时才能调用
      * @dev 只有在工作证明提交一段时间后才能提交纠纷（防止过早提交）
      */
-    function fileDisputeByWorker(
-        uint256 _taskId
-    )
+    function fileDisputeByWorker(uint256 _taskId)
         external
         onlyTaskWorker(_taskId)
         onlyTaskInProgress(_taskId)
@@ -351,13 +294,7 @@ contract FixedPaymentTask is BaseTask {
         }
 
         // 提交纠纷
-        submitDispute(
-            _taskId,
-            msg.sender,
-            task.creator,
-            task.totalreward,
-            proof.proof
-        );
+        submitDispute(_taskId, msg.sender, task.creator, task.totalreward, proof.proof);
 
         emit FixedPaymentTask_DisputeFiledByWorker(_taskId, msg.sender);
     }

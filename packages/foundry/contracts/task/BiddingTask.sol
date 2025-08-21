@@ -46,47 +46,21 @@ contract BiddingTask is BaseTask {
     error BiddingTask_NoProofOfWorkSubmitted();
 
     // 自定义事件
-    event BiddingTask_BidSubmitted(
-        uint256 indexed taskId,
-        address indexed bidder,
-        uint256 amount
-    );
+    event BiddingTask_BidSubmitted(uint256 indexed taskId, address indexed bidder, uint256 amount);
 
-    event BiddingTask_TaskWorkerAdded(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event BiddingTask_TaskWorkerAdded(uint256 indexed taskId, address indexed worker);
 
     event BiddingTask_TaskCancelled(uint256 indexed taskId);
 
-    event BiddingTask_TaskPaid(
-        uint256 indexed taskId,
-        uint256 amount,
-        uint256 platformFee
-    );
+    event BiddingTask_TaskPaid(uint256 indexed taskId, uint256 amount, uint256 platformFee);
 
-    event BiddingTask_ProofOfWorkSubmitted(
-        uint256 indexed taskId,
-        address indexed worker,
-        string proof
-    );
+    event BiddingTask_ProofOfWorkSubmitted(uint256 indexed taskId, address indexed worker, string proof);
 
-    event BiddingTask_ProofOfWorkApproved(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event BiddingTask_ProofOfWorkApproved(uint256 indexed taskId, address indexed worker);
 
-    event BiddingTask_DisputeFiledByWorker(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event BiddingTask_DisputeFiledByWorker(uint256 indexed taskId, address indexed worker);
 
-    event BiddingTaskCreated(
-        uint256 indexed taskId,
-        address indexed creator,
-        string title,
-        uint256 deadline
-    );
+    event BiddingTaskCreated(uint256 indexed taskId, address indexed creator, string title, uint256 deadline);
 
     /**
      * @notice modifier，检查调用者是否为任务的工作者
@@ -115,10 +89,7 @@ contract BiddingTask is BaseTask {
      * @param _taskToken 平台代币地址
      * @param _disputeResolver 纠纷解决合约地址
      */
-    constructor(
-        IERC20 _taskToken,
-        DisputeResolver _disputeResolver
-    ) BaseTask(_taskToken, _disputeResolver) {}
+    constructor(IERC20 _taskToken, IDisputeResolver _disputeResolver) BaseTask(_taskToken, _disputeResolver) { }
 
     /**
      * @notice 创建竞价任务
@@ -126,11 +97,11 @@ contract BiddingTask is BaseTask {
      * @param _description 任务描述
      * @param _deadline 任务截止时间
      */
-    function createTask(
-        string memory _title,
-        string memory _description,
-        uint256 _deadline
-    ) public override whenNotPaused {
+    function createTask(string memory _title, string memory _description, uint256 _deadline)
+        public
+        override
+        whenNotPaused
+    {
         if (_deadline < block.timestamp) {
             revert InvalidDeadline();
         }
@@ -157,12 +128,10 @@ contract BiddingTask is BaseTask {
      * @param _description 竞标描述
      * @param _estimatedTime 预计完成时间（秒）
      */
-    function submitBid(
-        uint256 _taskId,
-        uint256 _amount,
-        string memory _description,
-        uint256 _estimatedTime
-    ) external whenNotPaused {
+    function submitBid(uint256 _taskId, uint256 _amount, string memory _description, uint256 _estimatedTime)
+        external
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否开放竞标
@@ -186,12 +155,7 @@ contract BiddingTask is BaseTask {
 
         // 创建新的竞标
         taskBids[_taskId].push(
-            Bid({
-                bidder: msg.sender,
-                amount: _amount,
-                description: _description,
-                estimatedTime: _estimatedTime
-            })
+            Bid({ bidder: msg.sender, amount: _amount, description: _description, estimatedTime: _estimatedTime })
         );
 
         emit BiddingTask_BidSubmitted(_taskId, msg.sender, _amount);
@@ -202,10 +166,7 @@ contract BiddingTask is BaseTask {
      * @param _taskId 任务ID
      * @param _bidIndex 竞标索引
      */
-    function acceptBid(
-        uint256 _taskId,
-        uint256 _bidIndex
-    ) external onlyTaskCreator(_taskId) whenNotPaused {
+    function acceptBid(uint256 _taskId, uint256 _bidIndex) external onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否开放
@@ -226,16 +187,26 @@ contract BiddingTask is BaseTask {
     }
 
     /**
+     * @notice 获取指定任务的所有竞标信息
+     * @param _taskId 任务ID
+     * @return bids 所有竞标信息数组
+     */
+    function getAllBids(uint256 _taskId) external view returns (Bid[] memory bids) {
+        bids = taskBids[_taskId];
+    }
+
+    /**
      * @notice 添加工作者到任务中（在竞标任务中，由接受竞标触发）
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      * @param _reward 任务报酬
      */
-    function addWorker(
-        uint256 _taskId,
-        address _worker,
-        uint256 _reward
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function addWorker(uint256 _taskId, address _worker, uint256 _reward)
+        public
+        override
+        onlyTaskCreator(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
 
         // 设置任务工作者
@@ -256,39 +227,29 @@ contract BiddingTask is BaseTask {
      * @notice 终止任务
      * @param _taskId 任务ID
      */
-    function terminateTask(
-        uint256 _taskId
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function terminateTask(uint256 _taskId) public override onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务状态是否允许终止
-        if (
-            task.status != TaskStatus.Open &&
-            task.status != TaskStatus.InProgress
-        ) {
+        if (task.status == TaskStatus.Cancelled || task.status == TaskStatus.Paid) {
             revert BiddingTask_TaskCannotBeCancelled();
         }
 
         // 清理任务工作者并更新状态
         task.status = TaskStatus.Cancelled;
 
-        if (task.status == TaskStatus.InProgress) {
-            // 获取当前分配的工作者
-            address worker = taskWorker[_taskId];
+        // 获取当前分配的工作者
+        address worker = taskWorker[_taskId];
 
-            // 检查是否有工作量证明提交，如果有则可以提交纠纷
-            ProofOfWork storage proof = taskWorkProofs[_taskId][worker];
-            if (worker != address(0) && proof.submitted && !proof.approved) {
-                // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
-                // 资金将在纠纷解决时分配，这里不需要进行补偿
-                submitDispute(
-                    _taskId,
-                    worker,
-                    task.creator,
-                    task.totalreward,
-                    proof.proof
-                );
-            }
+        // 检查是否有工作量证明提交，如果有则可以提交纠纷
+        ProofOfWork memory proof = taskWorkProofs[_taskId][worker];
+        if (worker != address(0) && proof.submitted && !proof.approved) {
+            // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
+            // 资金将在纠纷解决时分配，这里不需要进行补偿
+            submitDispute(_taskId, worker, task.creator, task.totalreward, proof.proof);
+        } else if (task.totalreward > 0) {
+            taskToken.safeTransfer(task.creator, task.totalreward);
+            task.totalreward = 0;
         }
 
         emit BiddingTask_TaskCancelled(_taskId);
@@ -299,10 +260,7 @@ contract BiddingTask is BaseTask {
      * @param _taskId 任务ID
      * @param _proof 工作量证明内容
      */
-    function submitProofOfWork(
-        uint256 _taskId,
-        string memory _proof
-    )
+    function submitProofOfWork(uint256 _taskId, string memory _proof)
         external
         whenNotPaused
         onlyTaskWorker(_taskId)
@@ -321,12 +279,8 @@ contract BiddingTask is BaseTask {
             revert BiddingTask_ProofAlreadyApproved();
         }
 
-        taskWorkProofs[_taskId][msg.sender] = ProofOfWork({
-            proof: _proof,
-            submitted: true,
-            approved: false,
-            submittedAt: block.timestamp
-        });
+        taskWorkProofs[_taskId][msg.sender] =
+            ProofOfWork({ proof: _proof, submitted: true, approved: false, submittedAt: block.timestamp });
 
         emit BiddingTask_ProofOfWorkSubmitted(_taskId, msg.sender, _proof);
     }
@@ -336,10 +290,7 @@ contract BiddingTask is BaseTask {
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      */
-    function approveProofOfWork(
-        uint256 _taskId,
-        address _worker
-    )
+    function approveProofOfWork(uint256 _taskId, address _worker)
         external
         onlyTaskCreator(_taskId)
         whenNotPaused
@@ -366,9 +317,7 @@ contract BiddingTask is BaseTask {
      * @notice 支付任务奖励
      * @param _taskId 任务ID
      */
-    function payTask(
-        uint256 _taskId
-    ) external onlyTaskWorker(_taskId) whenNotPaused {
+    function payTask(uint256 _taskId) external onlyTaskWorker(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
         // 检查任务是否可以支付
@@ -400,9 +349,7 @@ contract BiddingTask is BaseTask {
      * @dev 只有在工作证明已提交但未被批准时才能调用
      * @dev 只有在工作证明提交一段时间后才能提交纠纷（防止过早提交）
      */
-    function fileDisputeByWorker(
-        uint256 _taskId
-    )
+    function fileDisputeByWorker(uint256 _taskId)
         external
         onlyTaskWorker(_taskId)
         onlyTaskInProgress(_taskId)
@@ -429,13 +376,7 @@ contract BiddingTask is BaseTask {
         }
 
         // 提交纠纷
-        submitDispute(
-            _taskId,
-            msg.sender,
-            task.creator,
-            task.totalreward,
-            proof.proof
-        );
+        submitDispute(_taskId, msg.sender, task.creator, task.totalreward, proof.proof);
 
         emit BiddingTask_DisputeFiledByWorker(_taskId, msg.sender);
     }
@@ -455,10 +396,7 @@ contract BiddingTask is BaseTask {
      * @param _bidIndex 竞标索引
      * @return 竞标信息
      */
-    function getBid(
-        uint256 _taskId,
-        uint256 _bidIndex
-    ) external view returns (Bid memory) {
+    function getBid(uint256 _taskId, uint256 _bidIndex) external view returns (Bid memory) {
         if (_bidIndex >= taskBids[_taskId].length) {
             revert BiddingTask_InvalidBidIndex();
         }

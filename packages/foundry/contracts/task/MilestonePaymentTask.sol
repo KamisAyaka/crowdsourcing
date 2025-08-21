@@ -50,43 +50,19 @@ contract MilestonePaymentTask is BaseTask {
     error MilestonePaymentTask_DisputeSubmissionPeriodNotReached();
 
     // 自定义事件
-    event MilestonePaymentTask_TaskWorkerAdded(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event MilestonePaymentTask_TaskWorkerAdded(uint256 indexed taskId, address indexed worker);
     event MilestonePaymentTask_TaskCancelled(uint256 indexed taskId);
-    event MilestonePaymentTask_MilestoneApproved(
-        uint256 indexed taskId,
-        uint256 milestoneIndex
-    );
+    event MilestonePaymentTask_MilestoneApproved(uint256 indexed taskId, uint256 milestoneIndex);
     event MilestonePaymentTask_MilestonePaid(
-        uint256 indexed taskId,
-        uint256 milestoneIndex,
-        uint256 amount,
-        uint256 platformFee
+        uint256 indexed taskId, uint256 milestoneIndex, uint256 amount, uint256 platformFee
     );
-    event MilestonePaymentTask_ProofOfWorkSubmitted(
-        uint256 indexed taskId,
-        address indexed worker,
-        string proof
-    );
-    event MilestonePaymentTask_DisputeFiledByWorker(
-        uint256 indexed taskId,
-        address indexed worker
-    );
+    event MilestonePaymentTask_ProofOfWorkSubmitted(uint256 indexed taskId, address indexed worker, string proof);
+    event MilestonePaymentTask_DisputeFiledByWorker(uint256 indexed taskId, address indexed worker);
     event MilestonePaymentTask_MilestoneAdded(
-        uint256 indexed taskId,
-        uint256 milestoneIndex,
-        string description,
-        uint256 reward
+        uint256 indexed taskId, uint256 milestoneIndex, string description, uint256 reward
     );
 
-    event MilestonePaymentTaskCreated(
-        uint256 indexed taskId,
-        address indexed creator,
-        string title,
-        uint256 deadline
-    );
+    event MilestonePaymentTaskCreated(uint256 indexed taskId, address indexed creator, string title, uint256 deadline);
 
     event MilestonePaymentTask_TaskCompleted(uint256 indexed taskId);
 
@@ -125,10 +101,7 @@ contract MilestonePaymentTask is BaseTask {
      * @param _taskToken 平台代币地址
      * @param _disputeResolver 纠纷解决合约地址
      */
-    constructor(
-        IERC20 _taskToken,
-        DisputeResolver _disputeResolver
-    ) BaseTask(_taskToken, _disputeResolver) {}
+    constructor(IERC20 _taskToken, IDisputeResolver _disputeResolver) BaseTask(_taskToken, _disputeResolver) { }
 
     /**
      * @notice 创建里程碑付款任务
@@ -136,11 +109,11 @@ contract MilestonePaymentTask is BaseTask {
      * @param _description 任务描述
      * @param _deadline 任务截止时间
      */
-    function createTask(
-        string memory _title,
-        string memory _description,
-        uint256 _deadline
-    ) public override whenNotPaused {
+    function createTask(string memory _title, string memory _description, uint256 _deadline)
+        public
+        override
+        whenNotPaused
+    {
         if (_deadline < block.timestamp) {
             revert InvalidDeadline();
         }
@@ -157,12 +130,7 @@ contract MilestonePaymentTask is BaseTask {
         newTask.status = TaskStatus.Open;
         newTask.createdAt = block.timestamp;
 
-        emit MilestonePaymentTaskCreated(
-            taskCounter,
-            msg.sender,
-            _title,
-            _deadline
-        );
+        emit MilestonePaymentTaskCreated(taskCounter, msg.sender, _title, _deadline);
     }
 
     /**
@@ -171,11 +139,12 @@ contract MilestonePaymentTask is BaseTask {
      * @param _worker 工作者地址
      * @param _reward 任务总奖励（将在添加里程碑时分配）
      */
-    function addWorker(
-        uint256 _taskId,
-        address _worker,
-        uint256 _reward
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function addWorker(uint256 _taskId, address _worker, uint256 _reward)
+        public
+        override
+        onlyTaskCreator(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
 
         if (task.status != TaskStatus.Open) {
@@ -206,11 +175,11 @@ contract MilestonePaymentTask is BaseTask {
      * @param _description 里程碑描述
      * @param _reward 里程碑报酬
      */
-    function addMilestone(
-        uint256 _taskId,
-        string memory _description,
-        uint256 _reward
-    ) external onlyTaskCreator(_taskId) whenNotPaused {
+    function addMilestone(uint256 _taskId, string memory _description, uint256 _reward)
+        external
+        onlyTaskCreator(_taskId)
+        whenNotPaused
+    {
         Task storage task = tasks[_taskId];
 
         // 只有进行中的任务可以添加里程碑
@@ -250,12 +219,7 @@ contract MilestonePaymentTask is BaseTask {
         );
 
         uint256 milestoneIndex = taskMilestones[_taskId].length - 1;
-        emit MilestonePaymentTask_MilestoneAdded(
-            _taskId,
-            milestoneIndex,
-            _description,
-            _reward
-        );
+        emit MilestonePaymentTask_MilestoneAdded(_taskId, milestoneIndex, _description, _reward);
     }
 
     /**
@@ -264,11 +228,7 @@ contract MilestonePaymentTask is BaseTask {
      * @param _milestoneIndex 里程碑索引
      * @param _proof 工作量证明内容
      */
-    function submitMilestoneProofOfWork(
-        uint256 _taskId,
-        uint256 _milestoneIndex,
-        string memory _proof
-    )
+    function submitMilestoneProofOfWork(uint256 _taskId, uint256 _milestoneIndex, string memory _proof)
         external
         whenNotPaused
         onlyTaskWorker(_taskId)
@@ -290,18 +250,10 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         // 更新里程碑的工作量证明
-        milestones[_milestoneIndex].workProof = ProofOfWork({
-            proof: _proof,
-            submitted: true,
-            approved: false,
-            submittedAt: block.timestamp
-        });
+        milestones[_milestoneIndex].workProof =
+            ProofOfWork({ proof: _proof, submitted: true, approved: false, submittedAt: block.timestamp });
 
-        emit MilestonePaymentTask_ProofOfWorkSubmitted(
-            _taskId,
-            msg.sender,
-            _proof
-        );
+        emit MilestonePaymentTask_ProofOfWorkSubmitted(_taskId, msg.sender, _proof);
     }
 
     /**
@@ -309,10 +261,7 @@ contract MilestonePaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _milestoneIndex 里程碑索引
      */
-    function approveMilestone(
-        uint256 _taskId,
-        uint256 _milestoneIndex
-    )
+    function approveMilestone(uint256 _taskId, uint256 _milestoneIndex)
         external
         onlyTaskCreator(_taskId)
         whenNotPaused
@@ -362,10 +311,11 @@ contract MilestonePaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @param _milestoneIndex 里程碑索引
      */
-    function payMilestone(
-        uint256 _taskId,
-        uint256 _milestoneIndex
-    ) public whenNotPaused InvalidMilestoneIndex(_taskId, _milestoneIndex) {
+    function payMilestone(uint256 _taskId, uint256 _milestoneIndex)
+        public
+        whenNotPaused
+        InvalidMilestoneIndex(_taskId, _milestoneIndex)
+    {
         Milestone storage milestone = taskMilestones[_taskId][_milestoneIndex];
 
         // 检查里程碑是否已批准
@@ -392,27 +342,17 @@ contract MilestonePaymentTask is BaseTask {
         address worker = taskWorker[_taskId];
         taskToken.safeTransfer(worker, payment);
 
-        emit MilestonePaymentTask_MilestonePaid(
-            _taskId,
-            _milestoneIndex,
-            payment,
-            fee
-        );
+        emit MilestonePaymentTask_MilestonePaid(_taskId, _milestoneIndex, payment, fee);
     }
 
     /**
      * @notice 终止任务，直接取消任务
      * @param _taskId 任务ID
      */
-    function terminateTask(
-        uint256 _taskId
-    ) public override onlyTaskCreator(_taskId) whenNotPaused {
+    function terminateTask(uint256 _taskId) public override onlyTaskCreator(_taskId) whenNotPaused {
         Task storage task = tasks[_taskId];
 
-        if (
-            task.status != TaskStatus.Open &&
-            task.status != TaskStatus.InProgress
-        ) {
+        if (task.status == TaskStatus.Cancelled || task.status == TaskStatus.Paid) {
             revert MilestonePaymentTask_TaskCannotBeCancelled();
         }
 
@@ -427,24 +367,12 @@ contract MilestonePaymentTask is BaseTask {
         if (worker != address(0) && length > 0) {
             // 检查是否有任何里程碑提交了工作量证明
             for (uint256 i = 0; i < length; i++) {
-                if (
-                    milestones[i].workProof.submitted &&
-                    !milestones[i].workProof.approved
-                ) {
+                if (milestones[i].workProof.submitted && !milestones[i].workProof.approved) {
                     // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
                     // 资金将在纠纷解决时分配，这里不需要进行补偿
-                    submitDispute(
-                        _taskId,
-                        worker,
-                        task.creator,
-                        task.totalreward,
-                        milestones[i].workProof.proof
-                    );
-                } else if (
-                    milestones[i].workProof.submitted &&
-                    milestones[i].workProof.approved &&
-                    !milestones[i].paid
-                ) {
+                    submitDispute(_taskId, worker, task.creator, task.totalreward, milestones[i].workProof.proof);
+                } else if (milestones[i].workProof.submitted && milestones[i].workProof.approved && !milestones[i].paid)
+                {
                     // 对于已批准但未支付的里程碑，进行支付
                     payMilestone(_taskId, i);
                 }
@@ -469,10 +397,7 @@ contract MilestonePaymentTask is BaseTask {
      * @dev 只有在工作证明已提交但未被批准时才能调用
      * @dev 只有在工作证明提交一段时间后才能提交纠纷（防止过早提交）
      */
-    function fileDisputeByWorker(
-        uint256 _taskId,
-        uint256 _milestoneIndex
-    )
+    function fileDisputeByWorker(uint256 _taskId, uint256 _milestoneIndex)
         external
         onlyTaskWorker(_taskId)
         onlyTaskInProgress(_taskId)
@@ -507,13 +432,7 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         // 提交纠纷
-        submitDispute(
-            _taskId,
-            msg.sender,
-            task.creator,
-            task.totalreward,
-            proof.proof
-        );
+        submitDispute(_taskId, msg.sender, task.creator, task.totalreward, proof.proof);
 
         emit MilestonePaymentTask_DisputeFiledByWorker(_taskId, msg.sender);
     }
@@ -523,9 +442,7 @@ contract MilestonePaymentTask is BaseTask {
      * @param _taskId 任务ID
      * @return 里程碑数量
      */
-    function getMilestonesCount(
-        uint256 _taskId
-    ) external view returns (uint256) {
+    function getMilestonesCount(uint256 _taskId) external view returns (uint256) {
         return taskMilestones[_taskId].length;
     }
 
@@ -535,10 +452,16 @@ contract MilestonePaymentTask is BaseTask {
      * @param _milestoneIndex 里程碑索引
      * @return 里程碑结构
      */
-    function getMilestone(
-        uint256 _taskId,
-        uint256 _milestoneIndex
-    ) external view returns (Milestone memory) {
+    function getMilestone(uint256 _taskId, uint256 _milestoneIndex) external view returns (Milestone memory) {
         return taskMilestones[_taskId][_milestoneIndex];
+    }
+
+    /**
+     * @notice 获取指定任务的所有里程碑信息
+     * @param _taskId 任务ID
+     * @return milestones 所有里程碑信息数组
+     */
+    function getAllMilestones(uint256 _taskId) external view returns (Milestone[] memory milestones) {
+        milestones = taskMilestones[_taskId];
     }
 }

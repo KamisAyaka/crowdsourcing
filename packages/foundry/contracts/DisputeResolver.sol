@@ -18,12 +18,14 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         Filed, // 已提交纠纷
         Resolved, // 已解决（质押者投票已处理完成）
         Distributed // 已分配（资金已分配）
+
     }
 
     // 管理员状态枚举
     enum AdminStatus {
         Inactive, // 未激活
         Active // 激活
+
     }
 
     // 管理员投票结构体
@@ -105,26 +107,14 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         address taskCreator
     );
 
-    event DisputeResolver_DisputeResolved(
-        uint256 indexed disputeId,
-        uint256 workerShare
-    );
+    event DisputeResolver_DisputeResolved(uint256 indexed disputeId, uint256 workerShare);
 
-    event DisputeResolver_ProposalApprovedByWorker(
-        uint256 indexed disputeId,
-        address worker
-    );
+    event DisputeResolver_ProposalApprovedByWorker(uint256 indexed disputeId, address worker);
 
-    event DisputeResolver_ProposalApprovedByCreator(
-        uint256 indexed disputeId,
-        address taskCreator
-    );
+    event DisputeResolver_ProposalApprovedByCreator(uint256 indexed disputeId, address taskCreator);
 
     event DisputeResolver_FundsDistributed(
-        uint256 indexed disputeId,
-        address worker,
-        uint256 workerShare,
-        address taskCreator
+        uint256 indexed disputeId, address worker, uint256 workerShare, address taskCreator
     );
 
     event DisputeResolver_ProposalRejected(uint256 indexed disputeId);
@@ -133,11 +123,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
     event DisputeResolver_AdminWithdrawn(address indexed admin, uint256 amount);
 
-    event DisputeResolver_AdminVoted(
-        uint256 indexed disputeId,
-        address indexed admin,
-        uint256 workerShare
-    );
+    event DisputeResolver_AdminVoted(uint256 indexed disputeId, address indexed admin, uint256 workerShare);
 
     modifier onlyActiveDispute(uint256 _disputeId) {
         if (_disputeId >= disputeCounter) {
@@ -237,13 +223,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         taskToken.safeTransferFrom(msg.sender, address(this), _rewardAmount);
 
-        emit DisputeResolver_DisputeFiled(
-            disputeCounter - 1,
-            _taskId,
-            _taskContract,
-            _worker,
-            _taskCreator
-        );
+        emit DisputeResolver_DisputeFiled(disputeCounter - 1, _taskId, _taskContract, _worker, _taskCreator);
     }
 
     /**
@@ -251,10 +231,11 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @param _disputeId 纠纷ID
      * @param _workerShare 分配给工作者的金额
      */
-    function voteOnDispute(
-        uint256 _disputeId,
-        uint256 _workerShare
-    ) external nonReentrant onlyActiveDispute(_disputeId) {
+    function voteOnDispute(uint256 _disputeId, uint256 _workerShare)
+        external
+        nonReentrant
+        onlyActiveDispute(_disputeId)
+    {
         // 检查是否是激活的管理员
         if (adminStatus[msg.sender] != AdminStatus.Active) {
             revert DisputeResolver_NotAdmin();
@@ -278,9 +259,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         }
 
         // 记录投票
-        dispute.votes.push(
-            AdminVote({admin: msg.sender, workerShare: _workerShare})
-        );
+        dispute.votes.push(AdminVote({ admin: msg.sender, workerShare: _workerShare }));
 
         // 标记为已投票
         hasVotedOnDispute[msg.sender][_disputeId] = true;
@@ -292,9 +271,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @notice 处理管理员投票，计算平均值并解决纠纷
      * @param _disputeId 纠纷ID
      */
-    function processVotes(
-        uint256 _disputeId
-    ) external nonReentrant onlyActiveDispute(_disputeId) {
+    function processVotes(uint256 _disputeId) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
 
         // 检查纠纷状态
@@ -326,11 +303,8 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         dispute.resolvedAt = block.timestamp;
 
         // 存储分配方案
-        distributionProposals[_disputeId] = DistributionProposal({
-            workerShare: averageWorkerShare,
-            workerApproved: false,
-            creatorApproved: false
-        });
+        distributionProposals[_disputeId] =
+            DistributionProposal({ workerShare: averageWorkerShare, workerApproved: false, creatorApproved: false });
 
         emit DisputeResolver_DisputeResolved(_disputeId, averageWorkerShare);
     }
@@ -339,13 +313,9 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @notice 纠纷相关方确认分配方案
      * @param _disputeId 纠纷ID
      */
-    function approveProposal(
-        uint256 _disputeId
-    ) external nonReentrant onlyActiveDispute(_disputeId) {
+    function approveProposal(uint256 _disputeId) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
-        DistributionProposal storage proposal = distributionProposals[
-            _disputeId
-        ];
+        DistributionProposal storage proposal = distributionProposals[_disputeId];
 
         // 检查调用者是否为纠纷相关方
         if (msg.sender != dispute.worker && msg.sender != dispute.taskCreator) {
@@ -359,9 +329,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
 
         // 检查是否已经确认过
         bool isWorker = msg.sender == dispute.worker;
-        bool alreadyApproved = isWorker
-            ? proposal.workerApproved
-            : proposal.creatorApproved;
+        bool alreadyApproved = isWorker ? proposal.workerApproved : proposal.creatorApproved;
         if (alreadyApproved) {
             revert DisputeResolver_AlreadyApproved();
         }
@@ -369,16 +337,10 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         // 更新确认状态
         if (isWorker) {
             proposal.workerApproved = true;
-            emit DisputeResolver_ProposalApprovedByWorker(
-                _disputeId,
-                msg.sender
-            );
+            emit DisputeResolver_ProposalApprovedByWorker(_disputeId, msg.sender);
         } else {
             proposal.creatorApproved = true;
-            emit DisputeResolver_ProposalApprovedByCreator(
-                _disputeId,
-                msg.sender
-            );
+            emit DisputeResolver_ProposalApprovedByCreator(_disputeId, msg.sender);
         }
     }
 
@@ -386,13 +348,9 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @notice 分配纠纷资金（需要双方同意后才能执行）
      * @param _disputeId 纠纷ID
      */
-    function distributeFunds(
-        uint256 _disputeId
-    ) external nonReentrant onlyActiveDispute(_disputeId) {
+    function distributeFunds(uint256 _disputeId) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
-        DistributionProposal storage proposal = distributionProposals[
-            _disputeId
-        ];
+        DistributionProposal storage proposal = distributionProposals[_disputeId];
 
         // 检查纠纷是否已解决
         if (dispute.status != DisputeStatus.Resolved) {
@@ -405,8 +363,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         }
 
         // 计算奖励金额
-        uint256 processingReward = (dispute.rewardAmount *
-            disputeProcessingRewardBps) / DenominatorFee;
+        uint256 processingReward = (dispute.rewardAmount * disputeProcessingRewardBps) / DenominatorFee;
 
         // 计算实际分配给工作者和创建者的金额（扣除奖励）
         uint256 workerAmount = proposal.workerShare;
@@ -454,25 +411,16 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
             }
         }
 
-        emit DisputeResolver_FundsDistributed(
-            _disputeId,
-            dispute.worker,
-            workerAmount,
-            dispute.taskCreator
-        );
+        emit DisputeResolver_FundsDistributed(_disputeId, dispute.worker, workerAmount, dispute.taskCreator);
     }
 
     /**
      * @notice 拒绝分配方案并重新进入解决状态
      * @param _disputeId 纠纷ID
      */
-    function rejectProposal(
-        uint256 _disputeId
-    ) external nonReentrant onlyActiveDispute(_disputeId) {
+    function rejectProposal(uint256 _disputeId) external nonReentrant onlyActiveDispute(_disputeId) {
         Dispute storage dispute = disputes[_disputeId];
-        DistributionProposal storage proposal = distributionProposals[
-            _disputeId
-        ];
+        DistributionProposal storage proposal = distributionProposals[_disputeId];
 
         // 检查调用者是否为纠纷相关方
         if (msg.sender != dispute.worker && msg.sender != dispute.taskCreator) {
@@ -485,17 +433,12 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         }
 
         // 计算拒绝费用（与处理奖励相同）
-        uint256 processingReward = (dispute.rewardAmount *
-            disputeProcessingRewardBps) / DenominatorFee;
+        uint256 processingReward = (dispute.rewardAmount * disputeProcessingRewardBps) / DenominatorFee;
         uint256 length = dispute.votes.length;
 
         // 收取拒绝费用并分配给评判人
         if (processingReward > 0) {
-            taskToken.safeTransferFrom(
-                msg.sender,
-                address(this),
-                processingReward
-            );
+            taskToken.safeTransferFrom(msg.sender, address(this), processingReward);
             uint256 rewardPerAdmin = processingReward / length;
 
             // 为参与投票的管理员增加质押资金（拒绝费用）
@@ -524,9 +467,7 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
      * @param _disputeId 纠纷ID
      * @return 纠纷结构体
      */
-    function getDispute(
-        uint256 _disputeId
-    ) external view returns (Dispute memory) {
+    function getDispute(uint256 _disputeId) external view returns (Dispute memory) {
         return disputes[_disputeId];
     }
 

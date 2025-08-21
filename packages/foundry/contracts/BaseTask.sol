@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./DisputeResolver.sol";
+import "./interface/IDisputeResolver.sol";
 
 /**
  * @title 基础任务合约
@@ -24,6 +24,7 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         Completed, // 已完成，等待支付
         Paid, // 已支付
         Cancelled // 已取消
+
     }
 
     // 任务结构体
@@ -72,8 +73,8 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
     // 平台代币地址
     IERC20 public taskToken;
 
-    // 纠纷解决合约地址
-    DisputeResolver public disputeResolver;
+    // 纠纷解决合约地址 - 使用接口而不是具体合约
+    IDisputeResolver public disputeResolver;
 
     // 存储所有任务
     mapping(uint256 => Task) public tasks;
@@ -101,10 +102,7 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
      * @param _taskToken 平台代币地址
      * @param _disputeResolver 纠纷解决合约地址
      */
-    constructor(
-        IERC20 _taskToken,
-        DisputeResolver _disputeResolver
-    ) Ownable(msg.sender) {
+    constructor(IERC20 _taskToken, IDisputeResolver _disputeResolver) Ownable(msg.sender) {
         if (address(_taskToken) == address(0)) {
             revert BaseTask_InvalidTaskToken();
         }
@@ -121,11 +119,7 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
      * @param _description 任务描述
      * @param _deadline 任务截止时间
      */
-    function createTask(
-        string memory _title,
-        string memory _description,
-        uint256 _deadline
-    ) public virtual;
+    function createTask(string memory _title, string memory _description, uint256 _deadline) public virtual;
 
     /**
      * @notice 抽象函数，由子合约实现具体的任务终止逻辑
@@ -138,11 +132,7 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
      * @param _taskId 任务ID
      * @param _worker 工作者地址
      */
-    function addWorker(
-        uint256 _taskId,
-        address _worker,
-        uint256 _reward
-    ) public virtual;
+    function addWorker(uint256 _taskId, address _worker, uint256 _reward) public virtual;
 
     /**
      * @notice 抽象函数，由子合约实现具体的纠纷提交逻辑
@@ -157,14 +147,11 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         address _worker,
         address _taskCreator,
         uint256 _rewardAmount,
-        string storage _proofOfWork
+        string memory _proofOfWork
     ) internal {
         tasks[_taskId].totalreward -= _rewardAmount;
         // 批准纠纷解决合约转移所需的资金
-        taskToken.safeIncreaseAllowance(
-            address(disputeResolver),
-            _rewardAmount
-        );
+        taskToken.safeIncreaseAllowance(address(disputeResolver), _rewardAmount);
 
         // 调用纠纷解决合约的fileDispute函数
         // 资金将从当前合约转移到纠纷解决合约中
