@@ -4,13 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import {
-  BugAntIcon,
-  ClipboardDocumentIcon,
-  MagnifyingGlassIcon,
-  UserIcon,
-  WalletIcon,
-} from "@heroicons/react/24/outline";
+import { BugAntIcon, MagnifyingGlassIcon, UserIcon, WalletIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 
 const Home: NextPage = () => {
@@ -86,16 +80,6 @@ const Home: NextPage = () => {
         <div className="grow bg-base-300 w-full mt-16 px-8 py-12">
           <div className="flex justify-center items-center gap-12 flex-col md:flex-row">
             <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <ClipboardDocumentIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                使用{" "}
-                <Link href="/tasks/fixed-payment" passHref className="link">
-                  固定薪酬任务
-                </Link>{" "}
-                页面创建和管理固定薪酬任务。
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
               <UserIcon className="h-8 w-8 fill-secondary" />
               <p>
                 使用{" "}
@@ -113,16 +97,6 @@ const Home: NextPage = () => {
                   调试合约
                 </Link>{" "}
                 页面与智能合约进行交互。
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                使用{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  区块链浏览器
-                </Link>{" "}
-                浏览交易和地址信息。
               </p>
             </div>
             <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
