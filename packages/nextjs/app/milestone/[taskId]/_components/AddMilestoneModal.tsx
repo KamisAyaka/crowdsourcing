@@ -2,7 +2,6 @@ import { useState } from "react";
 import { parseEther } from "viem";
 import { InputBase } from "~~/components/scaffold-eth";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface AddMilestoneModalProps {
   isOpen: boolean;
@@ -13,7 +12,7 @@ interface AddMilestoneModalProps {
 export const AddMilestoneModal = ({ isOpen, onClose, taskId }: AddMilestoneModalProps) => {
   const [description, setDescription] = useState("");
   const [reward, setReward] = useState("");
-  const writeTxn = useTransactor();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { writeContractAsync: addMilestone } = useScaffoldWriteContract({ contractName: "MilestonePaymentTask" });
 
@@ -26,18 +25,18 @@ export const AddMilestoneModal = ({ isOpen, onClose, taskId }: AddMilestoneModal
     const rewardInWei = parseEther(reward);
 
     try {
-      await writeTxn(
-        () =>
-          addMilestone({
-            functionName: "addMilestone",
-            args: [BigInt(taskId), description, rewardInWei],
-          }) as Promise<`0x${string}`>,
-        { onBlockConfirmation: onClose },
-      );
+      setIsSubmitting(true);
+      await addMilestone({
+        functionName: "addMilestone",
+        args: [BigInt(taskId), description, rewardInWei],
+      });
       setDescription("");
       setReward("");
+      onClose();
     } catch (e) {
       console.error("Error adding milestone:", e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -51,7 +50,13 @@ export const AddMilestoneModal = ({ isOpen, onClose, taskId }: AddMilestoneModal
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">里程碑描述</label>
-            <InputBase value={description} onChange={value => setDescription(value)} placeholder="输入里程碑描述" />
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="输入里程碑描述"
+              className="textarea textarea-bordered w-full"
+              rows={4}
+            />
           </div>
 
           <div>
@@ -62,11 +67,15 @@ export const AddMilestoneModal = ({ isOpen, onClose, taskId }: AddMilestoneModal
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
             取消
           </button>
-          <button className="btn btn-primary" onClick={handleAddMilestone}>
-            添加里程碑
+          <button
+            className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
+            onClick={handleAddMilestone}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "添加中..." : "添加里程碑"}
           </button>
         </div>
       </div>

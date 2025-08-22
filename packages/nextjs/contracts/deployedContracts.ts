@@ -762,6 +762,83 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getAllDisputes",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "tuple[]",
+              internalType: "struct DisputeResolver.Dispute[]",
+              components: [
+                {
+                  name: "taskId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "rewardAmount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "enum DisputeResolver.DisputeStatus",
+                },
+                {
+                  name: "filedAt",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "resolvedAt",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "votes",
+                  type: "tuple[]",
+                  internalType: "struct DisputeResolver.AdminVote[]",
+                  components: [
+                    {
+                      name: "admin",
+                      type: "address",
+                      internalType: "address",
+                    },
+                    {
+                      name: "workerShare",
+                      type: "uint256",
+                      internalType: "uint256",
+                    },
+                  ],
+                },
+                {
+                  name: "taskContract",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "worker",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "taskCreator",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "proofOfWork",
+                  type: "string",
+                  internalType: "string",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getDispute",
           inputs: [
             {
@@ -1301,7 +1378,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 1,
+      deployedOnBlock: 2,
     },
     UserInfo: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -1581,7 +1658,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 1,
+      deployedOnBlock: 2,
     },
     FixedPaymentTask: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -5836,6 +5913,83 @@ const deployedContracts = {
               name: "",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getAllDisputes",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "tuple[]",
+              internalType: "struct DisputeResolver.Dispute[]",
+              components: [
+                {
+                  name: "taskId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "rewardAmount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "enum DisputeResolver.DisputeStatus",
+                },
+                {
+                  name: "filedAt",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "resolvedAt",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "votes",
+                  type: "tuple[]",
+                  internalType: "struct DisputeResolver.AdminVote[]",
+                  components: [
+                    {
+                      name: "admin",
+                      type: "address",
+                      internalType: "address",
+                    },
+                    {
+                      name: "workerShare",
+                      type: "uint256",
+                      internalType: "uint256",
+                    },
+                  ],
+                },
+                {
+                  name: "taskContract",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "worker",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "taskCreator",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "proofOfWork",
+                  type: "string",
+                  internalType: "string",
+                },
+              ],
             },
           ],
           stateMutability: "view",

@@ -15,10 +15,19 @@ export const CreateTaskModal = ({ isOpen, onClose, onCreate }: CreateTaskModalPr
     // 将天数转换为秒数（区块链使用秒作为时间单位）
     const deadlineInSeconds = deadline * 24 * 60 * 60;
     onCreate(title, description, deadlineInSeconds);
+
     // 清空表单
     setTitle("");
     setDescription("");
     setDeadline(0);
+  };
+
+  const handleClose = () => {
+    // 清空表单
+    setTitle("");
+    setDescription("");
+    setDeadline(0);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -68,7 +77,7 @@ export const CreateTaskModal = ({ isOpen, onClose, onCreate }: CreateTaskModalPr
           <button className="btn btn-primary" onClick={handleSubmit}>
             创建任务
           </button>
-          <button className="btn" onClick={onClose}>
+          <button className="btn" onClick={handleClose}>
             取消
           </button>
         </div>

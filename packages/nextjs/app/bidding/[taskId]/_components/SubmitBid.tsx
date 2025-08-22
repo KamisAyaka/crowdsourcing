@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { parseEther } from "viem";
 import { useAccount } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 import { notification } from "~~/utils/scaffold-eth";
 
 interface SubmitBidProps {
@@ -14,7 +14,6 @@ export const SubmitBid = ({ taskId, isTaskOpen }: SubmitBidProps) => {
   const [bidAmount, setBidAmount] = useState("");
   const [bidDescription, setBidDescription] = useState("");
   const [estimatedTime, setEstimatedTime] = useState("");
-  const writeTxn = useTransactor();
   const { writeContractAsync: submitBid } = useScaffoldWriteContract({ contractName: "BiddingTask" });
 
   const handleSubmitBid = async () => {
@@ -34,13 +33,16 @@ export const SubmitBid = ({ taskId, isTaskOpen }: SubmitBidProps) => {
     }
 
     try {
-      await writeTxn(
-        () =>
-          submitBid({
-            functionName: "submitBid",
-            args: [taskId, BigInt(bidAmount), bidDescription, BigInt(estimatedTime)],
-          }) as Promise<`0x${string}`>,
-      );
+      // 将天数转换为秒数（1天 = 86400秒）
+      const estimatedTimeInSeconds = BigInt(estimatedTime) * BigInt(86400);
+
+      // 将竞标金额转换为正确的单位
+      const bidAmountInWei = parseEther(bidAmount);
+
+      await submitBid({
+        functionName: "submitBid",
+        args: [taskId, bidAmountInWei, bidDescription, estimatedTimeInSeconds],
+      });
       notification.success("竞标提交成功");
       // 清空表单
       setBidAmount("");
@@ -90,7 +92,7 @@ export const SubmitBid = ({ taskId, isTaskOpen }: SubmitBidProps) => {
         </div>
         <div className="form-control">
           <label className="label">
-            <span className="label-text font-bold">预计完成时间 (秒)</span>
+            <span className="label-text font-bold">预计完成时间 (天)</span>
           </label>
           <input
             type="number"
@@ -98,6 +100,7 @@ export const SubmitBid = ({ taskId, isTaskOpen }: SubmitBidProps) => {
             className="input input-bordered w-full"
             value={estimatedTime}
             onChange={e => setEstimatedTime(e.target.value)}
+            min="1"
           />
         </div>
         <button className="btn btn-primary w-full" onClick={handleSubmitBid}>

@@ -6,8 +6,6 @@ import { useParams } from "next/navigation";
 import { AddMilestoneModal } from "./_components/AddMilestoneModal";
 import { AddWorkerModal } from "./_components/AddWorkerModal";
 import { CancelTask } from "./_components/CancelTask";
-import { CompleteTaskButton } from "./_components/CompleteTaskButton";
-import { CreatorActions } from "./_components/CreatorActions";
 import { ExtendDeadline } from "./_components/ExtendDeadline";
 import { IncreaseReward } from "./_components/IncreaseReward";
 import { MilestonesList } from "./_components/MilestonesList";
@@ -15,7 +13,6 @@ import { SubmitProofModal } from "./_components/SubmitProofModal";
 import { TaskInfoCard } from "./_components/TaskInfoCard";
 import { useAccount } from "wagmi";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 const MilestoneTaskDetailPage = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -24,7 +21,6 @@ const MilestoneTaskDetailPage = () => {
   const [isAddMilestoneModalOpen, setIsAddMilestoneModalOpen] = useState(false);
   const [isProofModalOpen, setIsProofModalOpen] = useState(false);
   const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState<number | null>(null);
-  const writeTxn = useTransactor();
 
   // 获取任务详情
   const {
@@ -56,16 +52,13 @@ const MilestoneTaskDetailPage = () => {
     contractName: "MilestonePaymentTask",
   });
 
-  const { writeContractAsync: completeTask } = useScaffoldWriteContract({
-    contractName: "MilestonePaymentTask",
-  });
-
   const { writeContractAsync: payMilestone } = useScaffoldWriteContract({
     contractName: "MilestonePaymentTask",
   });
 
-  // 将只读数组转换为可变数组
-  const mutableMilestones = milestones ? [...milestones] : [];
+  const { writeContractAsync: completeTask } = useScaffoldWriteContract({
+    contractName: "MilestonePaymentTask",
+  });
 
   if (isTaskLoading) {
     return (
@@ -89,18 +82,17 @@ const MilestoneTaskDetailPage = () => {
   }
 
   // 解构任务数据
-  const [, creator, title, description, totalreward, deadline, status, createdAt] = task || [];
+  const [id, creator, title, description, totalreward, deadline, status, createdAt] = task || [];
 
   // 检查当前用户是否为任务创建者
   const isTaskCreator = connectedAddress && creator && connectedAddress.toLowerCase() === creator.toLowerCase();
   const isTaskWorker = connectedAddress && taskWorker && connectedAddress.toLowerCase() === taskWorker.toLowerCase();
 
   // 检查任务状态
-  const isTaskOpen = BigInt(status || 0n) === 0n;
   const isTaskInProgress = BigInt(status || 0n) === 1n;
-  const isTaskCompleted = BigInt(status || 0n) === 2n;
-  // const isTaskPaid = status === 4n;
-  // const isTaskCancelled = status === 3n;
+
+  // 将只读数组转换为可变数组
+  const mutableMilestones = milestones ? [...milestones] : [];
 
   // 处理各种操作
   const handleAddWorkerClick = () => {
@@ -113,13 +105,11 @@ const MilestoneTaskDetailPage = () => {
 
   const handleApproveMilestone = async (index: number) => {
     try {
-      await writeTxn(
-        () =>
-          approveMilestone({
-            functionName: "approveMilestone",
-            args: [BigInt(taskId), BigInt(index)],
-          }) as Promise<`0x${string}`>,
-      );
+      const result = await approveMilestone({
+        functionName: "approveMilestone",
+        args: [BigInt(taskId), BigInt(index)],
+      });
+      console.log("Approval transaction result:", result);
       refetchTask();
     } catch (e) {
       console.error("Error approving milestone:", e);
@@ -128,13 +118,11 @@ const MilestoneTaskDetailPage = () => {
 
   const handlePayMilestone = async (index: number) => {
     try {
-      await writeTxn(
-        () =>
-          payMilestone({
-            functionName: "payMilestone",
-            args: [BigInt(taskId), BigInt(index)],
-          }) as Promise<`0x${string}`>,
-      );
+      const result = await payMilestone({
+        functionName: "payMilestone",
+        args: [BigInt(taskId), BigInt(index)],
+      });
+      console.log("Payment transaction result:", result);
       refetchTask();
     } catch (e) {
       console.error("Error claiming milestone reward:", e);
@@ -148,13 +136,11 @@ const MilestoneTaskDetailPage = () => {
 
   const handleCompleteTask = async () => {
     try {
-      await writeTxn(
-        () =>
-          completeTask({
-            functionName: "completeTask",
-            args: [BigInt(taskId)],
-          }) as Promise<`0x${string}`>,
-      );
+      const result = await completeTask({
+        functionName: "completeTask",
+        args: [BigInt(taskId)],
+      });
+      console.log("Complete task transaction result:", result);
       refetchTask();
     } catch (e) {
       console.error("Error completing task:", e);
@@ -162,16 +148,47 @@ const MilestoneTaskDetailPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center pt-10 px-4">
-      <div className="w-full max-w-4xl">
-        <div className="mb-6">
+    <div className="flex flex-col items-center pt-10 px-2 min-h-screen bg-gradient-to-br from-base-200 to-base-100">
+      <div className="w-full max-w-4xl space-y-8">
+        <div className="flex justify-between items-center">
           <Link href="/milestone" className="btn btn-sm btn-outline">
             ← 返回任务列表
           </Link>
+          <div className="flex gap-2">
+            {/* 只有任务创建者操作按钮 */}
+            {isTaskCreator && (
+              <>
+                {/* 只有任务创建者且任务不是已取消或已支付状态时才显示取消任务按钮 */}
+                {Number(status) !== 4 && Number(status) !== 3 && (
+                  <CancelTask taskId={taskId} isTaskCreator={!!isTaskCreator} isTaskInProgress={isTaskInProgress} />
+                )}
+                {/* 只有任务创建者且所有里程碑都已完成时才能完成任务 */}
+                {isTaskInProgress && mutableMilestones.length > 0 && (
+                  <button className="btn btn-primary btn-sm" onClick={handleCompleteTask}>
+                    完成任务
+                  </button>
+                )}
+                {/* 添加工作者按钮 - 仅当任务状态为Open且未分配工作者时显示 */}
+                {Number(status) === 0 && (
+                  <button className="btn btn-primary btn-sm" onClick={handleAddWorkerClick}>
+                    添加工作者
+                  </button>
+                )}
+                {/* 添加里程碑按钮 - 仅当任务状态为InProgress时显示 */}
+                {Number(status) === 1 && (
+                  <button className="btn btn-primary btn-sm" onClick={handleAddMilestoneClick}>
+                    添加里程碑
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
+        {/* 任务详情卡片 */}
         <TaskInfoCard
           task={{
+            id: id || 0n,
             creator: creator || "",
             title: title || "",
             description: description || "",
@@ -180,66 +197,52 @@ const MilestoneTaskDetailPage = () => {
             status: Number(status) || 0,
             createdAt: createdAt || 0n,
           }}
-          isTaskCreator={!!isTaskCreator}
-          isTaskWorker={!!isTaskWorker}
-          taskWorker={taskWorker}
+          taskWorker={taskWorker || ""}
         />
 
-        <CreatorActions
+        {/* 里程碑列表 */}
+        {mutableMilestones.length > 0 && (
+          <MilestonesList
+            milestones={mutableMilestones}
+            isTaskCreator={!!isTaskCreator}
+            isTaskWorker={!!isTaskWorker}
+            onApproveMilestone={handleApproveMilestone}
+            onPayMilestone={handlePayMilestone}
+            onSubmitProof={handleSubmitProof}
+          />
+        )}
+
+        {/* 工作量证明提交模态框 */}
+        <SubmitProofModal
+          isOpen={isProofModalOpen}
+          onClose={() => {
+            setIsProofModalOpen(false);
+            setSelectedMilestoneIndex(null);
+          }}
           taskId={taskId}
-          onAddWorkerClick={handleAddWorkerClick}
-          onAddMilestoneClick={handleAddMilestoneClick}
+          milestoneIndex={selectedMilestoneIndex}
         />
 
-        <MilestonesList
-          milestones={mutableMilestones}
-          isTaskCreator={!!isTaskCreator}
-          isTaskWorker={!!isTaskWorker}
-          onApproveMilestone={handleApproveMilestone}
-          onPayMilestone={handlePayMilestone}
-          onSubmitProof={handleSubmitProof}
-        />
-
-        <CompleteTaskButton
-          isTaskCreator={!!isTaskCreator}
-          isTaskInProgress={isTaskInProgress}
-          milestonesLength={mutableMilestones.length}
-          onCompleteTask={handleCompleteTask}
-        />
-
-        {/* 只有任务创建者且任务状态为Open或InProgress时才能取消任务 */}
+        {/* 操作区：延长截止日期和增加奖励同一行 */}
         {isTaskCreator && (
-          <CancelTask taskId={taskId} isTaskCreator={!!isTaskCreator} isTaskInProgress={isTaskInProgress} />
+          <div className="flex flex-wrap gap-4 mt-2">
+            <div className="flex-1 min-w-[220px]">
+              <ExtendDeadline taskId={taskId} currentDeadline={deadline} onSuccess={refetchTask} />
+            </div>
+            <div className="flex-1 min-w-[220px]">
+              <IncreaseReward taskId={taskId} onSuccess={refetchTask} />
+            </div>
+          </div>
         )}
 
-        {/* 只有任务创建者且任务状态为Open或InProgress时才能延长截止日期 */}
-        {isTaskCreator && (isTaskOpen || isTaskInProgress) && (
-          <ExtendDeadline taskId={taskId} currentDeadline={deadline} onSuccess={refetchTask} />
-        )}
+        <AddWorkerModal isOpen={isAddWorkerModalOpen} onClose={() => setIsAddWorkerModalOpen(false)} taskId={taskId} />
 
-        {/* 只有任务创建者且任务状态为Open、InProgress或Completed时才能增加奖励 */}
-        {isTaskCreator && (isTaskOpen || isTaskInProgress || isTaskCompleted) && (
-          <IncreaseReward taskId={taskId} onSuccess={refetchTask} />
-        )}
+        <AddMilestoneModal
+          isOpen={isAddMilestoneModalOpen}
+          onClose={() => setIsAddMilestoneModalOpen(false)}
+          taskId={taskId}
+        />
       </div>
-
-      <AddWorkerModal isOpen={isAddWorkerModalOpen} onClose={() => setIsAddWorkerModalOpen(false)} taskId={taskId} />
-
-      <AddMilestoneModal
-        isOpen={isAddMilestoneModalOpen}
-        onClose={() => setIsAddMilestoneModalOpen(false)}
-        taskId={taskId}
-      />
-
-      <SubmitProofModal
-        isOpen={isProofModalOpen}
-        onClose={() => {
-          setIsProofModalOpen(false);
-          setSelectedMilestoneIndex(null);
-        }}
-        taskId={taskId}
-        milestoneIndex={selectedMilestoneIndex}
-      />
     </div>
   );
 };

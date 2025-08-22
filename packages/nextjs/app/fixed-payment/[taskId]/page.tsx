@@ -120,80 +120,85 @@ const FixedPaymentTaskDetailPage = () => {
   const isTaskCreator = connectedAddress && creator && connectedAddress.toLowerCase() === creator.toLowerCase();
 
   return (
-    <div className="flex flex-col items-center pt-10 px-4">
-      <div className="w-full max-w-4xl">
-        <div className="mb-6">
+    <div className="flex flex-col items-center pt-10 px-2 min-h-screen bg-gradient-to-br from-base-200 to-base-100">
+      <div className="w-full max-w-4xl space-y-8">
+        <div className="flex justify-between items-center">
           <Link href="/fixed-payment" className="btn btn-sm btn-outline">
             ← 返回任务列表
           </Link>
-        </div>
-
-        <div className="card bg-base-100 shadow-xl mb-6">
-          <div className="card-body">
-            <div className="flex justify-between items-start">
-              <h1 className="card-title text-2xl">{title}</h1>
-              <span className={`badge ${getStatusColor(status)} badge-lg`}>{getStatusText(status)}</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <p className="text-sm text-gray-500">任务ID</p>
-                <p>#{id.toString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">创建时间</p>
-                <p>{formatCreatedAt(createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">截止时间</p>
-                <p>{formatDeadline(deadline)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">任务报酬</p>
-                <p>{formatUnits(totalreward, 18)} TST</p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">任务描述</p>
-              <p className="mt-1">{description}</p>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">任务创建者</p>
-              <Address address={creator} />
-            </div>
-
-            {taskWorker && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-500">工作者</p>
-                <Address address={taskWorker} />
-              </div>
+          <div className="flex gap-2">
+            {/* 只有任务创建者且任务不是已取消或已支付状态时才显示取消任务按钮 */}
+            {isTaskCreator && status !== 4 && status !== 3 && (
+              <CancelTask taskId={taskId as string} taskStatus={status} onSuccess={refetchTask} />
             )}
+            {/* 只有工作者且任务状态为InProgress时才显示提交工作量证明按钮 */}
+            {status === 1 &&
+              taskWorker &&
+              connectedAddress &&
+              taskWorker.toLowerCase() === connectedAddress.toLowerCase() && (
+                <button className="btn btn-primary" onClick={() => setIsProofModalOpen(true)}>
+                  提交工作量证明
+                </button>
+              )}
+            {/* 只有工作者且任务状态为Completed时才能申领报酬 */}
+            {connectedAddress &&
+              taskWorker &&
+              connectedAddress.toLowerCase() === taskWorker.toLowerCase() &&
+              status === 2 && <ClaimReward taskId={taskId as string} onSuccess={refetchTask} />}
           </div>
         </div>
 
-        {/* 只有任务创建者且任务状态为Open时才能添加工作者 */}
-        {isTaskCreator && status === 0 && <AddWorker taskId={taskId as string} onSuccess={refetchTask} />}
-
-        {/* 任务状态为InProgress时显示工作者信息 */}
-        {status === 1 && taskWorker && (
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <div className="flex justify-between items-center">
-                <h2 className="card-title">任务进行中</h2>
-                {connectedAddress && taskWorker && connectedAddress.toLowerCase() === taskWorker.toLowerCase() && (
-                  <button className="btn btn-primary" onClick={() => setIsProofModalOpen(true)}>
-                    提交工作量证明
-                  </button>
+        {/* 任务详情卡片 */}
+        <div className="card bg-base-100 shadow-2xl border border-base-300 rounded-3xl">
+          <div className="card-body">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+              <div className="flex-1">
+                <h1 className="card-title text-3xl font-bold mb-2 text-primary">{title}</h1>
+                <span className={`badge ${getStatusColor(status)} badge-lg text-base mt-2`}>
+                  {getStatusText(status)}
+                </span>
+                <div className="mt-4 bg-base-200 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">任务描述</p>
+                  <p className="mt-1 text-base leading-relaxed">{description}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-4 min-w-[180px] items-end">
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务ID</div>
+                  <div className="font-mono text-lg">#{id.toString()}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">创建时间</div>
+                  <div className="font-semibold">{formatCreatedAt(createdAt)}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">截止时间</div>
+                  <div className="font-semibold">{formatDeadline(deadline)}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务报酬</div>
+                  <div className="font-semibold">{formatUnits(totalreward, 18)} TST</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务创建者</div>
+                  <Address address={creator} />
+                </div>
+                {taskWorker && (
+                  <div className="bg-base-200 rounded-xl p-3 w-full">
+                    <div className="text-xs text-gray-500">工作者</div>
+                    <Address address={taskWorker} />
+                  </div>
                 )}
               </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">工作者</span>
-                </label>
-                <Address address={taskWorker} />
-              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 操作区：添加工作者 */}
+        {isTaskCreator && status === 0 && (
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[220px]">
+              <AddWorker taskId={taskId as string} onSuccess={refetchTask} />
             </div>
           </div>
         )}
@@ -211,79 +216,58 @@ const FixedPaymentTaskDetailPage = () => {
 
         {/* 显示已提交的工作量证明 */}
         {taskProof && taskProof[0] && (
-          <div className="card bg-base-100 shadow-xl mt-6">
-            <div className="card-body">
-              <h2 className="card-title">工作量证明</h2>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">提交时间</span>
-                </label>
-                <p>{new Date(Number(taskProof[3]) * 1000).toLocaleString()}</p>
-              </div>
-              <div className="form-control mt-4">
-                <label className="label">
-                  <span className="label-text">证明内容</span>
-                </label>
-                <div className="p-4 bg-base-200 rounded-lg">
-                  <p>{taskProof[0]}</p>
+          <div className="card bg-base-100 shadow border border-base-300 rounded-2xl">
+            <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h2 className="card-title text-xl font-bold mb-2">工作量证明</h2>
+                <div className="form-control mt-2">
+                  <label className="label">
+                    <span className="label-text">提交时间</span>
+                  </label>
+                  <p className="font-mono">{new Date(Number(taskProof[3]) * 1000).toLocaleString()}</p>
                 </div>
-              </div>
-              <div className="form-control mt-4">
-                <label className="label">
-                  <span className="label-text">状态</span>
-                </label>
-                <p>{taskProof[2] ? "已批准" : "待批准"}</p>
-              </div>
-
-              {/* 只有任务创建者且工作量证明尚未批准时才显示批准按钮 */}
-              {isTaskCreator && !taskProof[2] && status === 1 && taskWorker && (
-                <div className="card-actions justify-end mt-4">
-                  <ApproveProof taskId={taskId as string} workerAddress={taskWorker} onSuccess={refetchTask} />
-                </div>
-              )}
-
-              {/* 只有工作者且工作量证明尚未批准时才显示提出纠纷按钮 */}
-              {connectedAddress &&
-                taskWorker &&
-                connectedAddress.toLowerCase() === taskWorker.toLowerCase() &&
-                !taskProof[2] &&
-                status === 1 && (
-                  <div className="card-actions justify-end mt-4">
-                    <DisputeButton taskId={taskId as string} onSuccess={refetchTask} />
+                <div className="form-control mt-4">
+                  <label className="label">
+                    <span className="label-text">证明内容</span>
+                  </label>
+                  <div className="p-4 bg-base-200 rounded-lg text-base">
+                    <p>{taskProof[0]}</p>
                   </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-4 justify-center items-end">
+                <div className="form-control mt-4">
+                  <label className="label">
+                    <span className="label-text">状态</span>
+                  </label>
+                  <p className="font-semibold">{taskProof[2] ? "已批准" : "待批准"}</p>
+                </div>
+                {/* 只有任务创建者且工作量证明尚未批准时才显示批准按钮 */}
+                {isTaskCreator && !taskProof[2] && status === 1 && taskWorker && (
+                  <ApproveProof taskId={taskId as string} workerAddress={taskWorker} onSuccess={refetchTask} />
                 )}
+                {/* 只有工作者且工作量证明尚未批准时才显示提出纠纷按钮 */}
+                {connectedAddress &&
+                  taskWorker &&
+                  connectedAddress.toLowerCase() === taskWorker.toLowerCase() &&
+                  !taskProof[2] &&
+                  status === 1 && <DisputeButton taskId={taskId as string} onSuccess={refetchTask} />}
+              </div>
             </div>
           </div>
         )}
 
-        {/* 只有任务创建者且任务状态为Open或InProgress时才能取消任务 */}
-        {isTaskCreator && <CancelTask taskId={taskId as string} taskStatus={status} onSuccess={refetchTask} />}
-
-        {/* 只有任务创建者且任务状态为Open或InProgress时才能延长截止日期 */}
-        {isTaskCreator && (status === 0 || status === 1) && (
-          <ExtendDeadline taskId={taskId as string} currentDeadline={deadline} onSuccess={refetchTask} />
-        )}
-
-        {/* 只有任务创建者且任务状态为Open、InProgress或Completed时才能增加奖励 */}
+        {/* 操作区：延长截止日期和增加奖励同一行 */}
         {isTaskCreator && (status === 0 || status === 1 || status === 2) && (
-          <IncreaseReward taskId={taskId as string} onSuccess={refetchTask} />
-        )}
-
-        {/* 只有工作者且任务状态为Completed时才能申领报酬 */}
-        {connectedAddress &&
-          taskWorker &&
-          connectedAddress.toLowerCase() === taskWorker.toLowerCase() &&
-          status === 2 && (
-            <div className="card bg-base-100 shadow-xl mt-6">
-              <div className="card-body">
-                <h2 className="card-title">申领报酬</h2>
-                <p className="text-sm text-gray-500">您的工作量证明已被批准，现在可以申领您的报酬。</p>
-                <div className="card-actions justify-end">
-                  <ClaimReward taskId={taskId as string} onSuccess={refetchTask} />
-                </div>
-              </div>
+          <div className="flex flex-wrap gap-4 mt-2">
+            <div className="flex-1 min-w-[220px]">
+              <ExtendDeadline taskId={taskId as string} currentDeadline={deadline} onSuccess={refetchTask} />
             </div>
-          )}
+            <div className="flex-1 min-w-[220px]">
+              <IncreaseReward taskId={taskId as string} onSuccess={refetchTask} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

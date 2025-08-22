@@ -26,8 +26,6 @@ export const TaskCard = ({ taskId, selectedStatus }: TaskCardProps) => {
         return "Open";
       case 1:
         return "InProgress";
-      case 2:
-        return "Completed";
       case 3:
         return "Paid";
       case 4:
@@ -43,8 +41,6 @@ export const TaskCard = ({ taskId, selectedStatus }: TaskCardProps) => {
         return "badge-success";
       case 1: // InProgress
         return "badge-warning";
-      case 2: // Completed
-        return "badge-info";
       case 3: // Paid
         return "badge-primary";
       case 4: // Cancelled

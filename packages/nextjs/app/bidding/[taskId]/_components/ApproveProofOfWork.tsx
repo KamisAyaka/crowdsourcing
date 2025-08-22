@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface ApproveProofOfWorkProps {
   taskId: bigint;
@@ -17,20 +16,16 @@ export const ApproveProofOfWork = ({
 }: ApproveProofOfWorkProps) => {
   const [isApproving, setIsApproving] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
-  const writeTxn = useTransactor();
   const { writeContractAsync: approveProofOfWork } = useScaffoldWriteContract({ contractName: "BiddingTask" });
 
   const handleApproveProof = async () => {
     try {
       setIsApproving(true);
 
-      await writeTxn(
-        () =>
-          approveProofOfWork({
-            functionName: "approveProofOfWork",
-            args: [taskId, taskWorker],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveProofOfWork({
+        functionName: "approveProofOfWork",
+        args: [taskId, taskWorker],
+      });
     } catch (e) {
       console.error("Error approving proof of work:", e);
     } finally {
@@ -42,13 +37,10 @@ export const ApproveProofOfWork = ({
     try {
       setIsPaying(true);
 
-      await writeTxn(
-        () =>
-          approveProofOfWork({
-            functionName: "payTask",
-            args: [taskId],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveProofOfWork({
+        functionName: "payTask",
+        args: [taskId],
+      });
     } catch (e) {
       console.error("Error paying task:", e);
     } finally {

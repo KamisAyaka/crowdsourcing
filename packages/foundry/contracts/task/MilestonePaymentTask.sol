@@ -178,14 +178,10 @@ contract MilestonePaymentTask is BaseTask {
     function addMilestone(uint256 _taskId, string memory _description, uint256 _reward)
         external
         onlyTaskCreator(_taskId)
+        onlyTaskInProgress(_taskId)
         whenNotPaused
     {
         Task storage task = tasks[_taskId];
-
-        // 只有进行中的任务可以添加里程碑
-        if (task.status != TaskStatus.InProgress) {
-            revert MilestonePaymentTask_TaskNotInProgress(_taskId);
-        }
 
         // 检查奖励是否有效
         if (_reward == 0) {
@@ -265,6 +261,7 @@ contract MilestonePaymentTask is BaseTask {
         external
         onlyTaskCreator(_taskId)
         whenNotPaused
+        onlyTaskInProgress(_taskId)
         InvalidMilestoneIndex(_taskId, _milestoneIndex)
     {
         Milestone storage milestone = taskMilestones[_taskId][_milestoneIndex];
@@ -301,7 +298,7 @@ contract MilestonePaymentTask is BaseTask {
             revert MilestonePaymentTask_MilestoneNotApproved();
         }
 
-        task.status = TaskStatus.Completed;
+        task.status = TaskStatus.Paid;
 
         emit MilestonePaymentTask_TaskCompleted(_taskId);
     }
@@ -370,7 +367,7 @@ contract MilestonePaymentTask is BaseTask {
                 if (milestones[i].workProof.submitted && !milestones[i].workProof.approved) {
                     // 如果工作者已经提交了工作量证明，则提交纠纷进行评判
                     // 资金将在纠纷解决时分配，这里不需要进行补偿
-                    submitDispute(_taskId, worker, task.creator, task.totalreward, milestones[i].workProof.proof);
+                    submitDispute(_taskId, worker, task.creator, milestones[i].reward, milestones[i].workProof.proof);
                 } else if (milestones[i].workProof.submitted && milestones[i].workProof.approved && !milestones[i].paid)
                 {
                     // 对于已批准但未支付的里程碑，进行支付

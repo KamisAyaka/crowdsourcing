@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { notification } from "~~/utils/scaffold-eth";
 
 export const DisputeButton = ({ taskId, onSuccess }: { taskId: string; onSuccess?: () => void }) => {
   const { address: connectedAddress } = useAccount();
@@ -23,9 +24,11 @@ export const DisputeButton = ({ taskId, onSuccess }: { taskId: string; onSuccess
         functionName: "fileDisputeByWorker",
         args: [BigInt(taskId)],
       });
+      notification.success("纠纷提交成功");
       onSuccess?.();
     } catch (e) {
       console.error("Error filing dispute:", e);
+      notification.error("提交纠纷失败");
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface ClaimRewardProps {
   taskId: string;
@@ -9,20 +8,16 @@ interface ClaimRewardProps {
 
 export const ClaimReward = ({ taskId, onSuccess }: ClaimRewardProps) => {
   const [isClaiming, setIsClaiming] = useState(false);
-  const writeTxn = useTransactor();
   const { writeContractAsync: payTask } = useScaffoldWriteContract({ contractName: "BiddingTask" });
 
   const handleClaimReward = async () => {
     try {
       setIsClaiming(true);
 
-      await writeTxn(
-        () =>
-          payTask({
-            functionName: "payTask",
-            args: [BigInt(taskId)],
-          }) as Promise<`0x${string}`>,
-      );
+      await payTask({
+        functionName: "payTask",
+        args: [BigInt(taskId)],
+      });
 
       if (onSuccess) {
         onSuccess();

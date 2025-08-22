@@ -9,26 +9,18 @@ import { ClaimReward } from "./_components/ClaimReward";
 import { DisputeButton } from "./_components/DisputeButton";
 import { ExtendDeadline } from "./_components/ExtendDeadline";
 import { IncreaseReward } from "./_components/IncreaseReward";
+import { SubmitBid } from "./_components/SubmitBid";
 import { SubmitProofOfWork } from "./_components/SubmitProofOfWork";
-import { parseEther } from "viem";
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
-import { notification } from "~~/utils/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 export default function BiddingTaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const { address: connectedAddress } = useAccount();
   const [taskData, setTaskData] = useState<any>(null);
   const [taskWorker, setTaskWorker] = useState<string>("");
-  const [showBidForm, setShowBidForm] = useState(false);
-  const [bidAmount, setBidAmount] = useState("");
-  const [bidDescription, setBidDescription] = useState("");
-  const [estimatedTime, setEstimatedTime] = useState("");
   const [isProofModalOpen, setIsProofModalOpen] = useState(false);
-  const writeTxn = useTransactor();
-  const { writeContractAsync: submitBid } = useScaffoldWriteContract({ contractName: "BiddingTask" });
 
   // 获取任务详情
   const {
@@ -121,37 +113,6 @@ export default function BiddingTaskDetailPage() {
     }
   };
 
-  const handleSubmitBid = async () => {
-    if (!connectedAddress) {
-      notification.error("请先连接钱包");
-      return;
-    }
-
-    if (!bidAmount || !bidDescription || !estimatedTime) {
-      notification.error("请填写所有竞标信息");
-      return;
-    }
-
-    try {
-      await writeTxn(
-        () =>
-          submitBid({
-            functionName: "submitBid",
-            args: [BigInt(taskId), parseEther(bidAmount), bidDescription, BigInt(estimatedTime) * BigInt(86400)],
-          }) as Promise<`0x${string}`>,
-      );
-      notification.success("竞标提交成功");
-      setShowBidForm(false);
-      setBidAmount("");
-      setBidDescription("");
-      setEstimatedTime("");
-      refetchTask(); // 添加这行来刷新任务数据
-    } catch (e) {
-      console.error("Error submitting bid:", e);
-      notification.error("提交竞标失败");
-    }
-  };
-
   if (isTaskLoading) {
     return (
       <div className="flex items-center justify-center pt-10">
@@ -185,180 +146,102 @@ export default function BiddingTaskDetailPage() {
   const isTaskWorker = connectedAddress === taskWorker;
 
   return (
-    <div className="flex flex-col items-center pt-10 px-4">
-      <div className="w-full max-w-4xl">
-        <div className="mb-6">
+    <div className="flex flex-col items-center pt-10 px-2 min-h-screen bg-gradient-to-br from-base-200 to-base-100">
+      <div className="w-full max-w-4xl space-y-8">
+        <div className="flex justify-between items-center">
           <Link href="/bidding" className="btn btn-sm btn-outline">
             ← 返回任务列表
           </Link>
+          <div className="flex gap-2">
+            {/* 查看竞标者列表按钮 */}
+            {isTaskCreator && isTaskOpen && !hasWorker && (
+              <Link href={`/bidding/${taskId}/BidPage`} className="btn btn-primary btn-sm">
+                查看竞标者列表
+              </Link>
+            )}
+            {/* 取消任务按钮 */}
+            {isTaskCreator && status !== 4 && status !== 3 && (
+              <CancelTask taskId={taskId} taskStatus={status} onSuccess={refetchTask} />
+            )}
+            {/* 只有工作者且任务状态为InProgress时才显示提交工作量证明按钮 */}
+            {isTaskInProgress && hasWorker && isTaskWorker && (
+              <button className="btn btn-primary btn-sm" onClick={() => setIsProofModalOpen(true)}>
+                提交工作量证明
+              </button>
+            )}
+            {/* 只有工作者且任务状态为Completed时才能申领报酬 */}
+            {isTaskWorker && isTaskCompleted && <ClaimReward taskId={taskId} onSuccess={refetchTask} />}
+          </div>
         </div>
 
-        <div className="card bg-base-100 shadow-xl mb-6">
+        {/* 任务详情卡片 */}
+        <div className="card bg-base-100 shadow-2xl border border-base-300 rounded-3xl">
           <div className="card-body">
-            <div className="flex justify-between items-start">
-              <h1 className="card-title text-2xl">{title}</h1>
-              <span className={`badge ${getStatusColor(status)} badge-lg`}>{getStatusText(status)}</span>
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+              <div className="flex-1">
+                <h1 className="card-title text-3xl font-bold mb-2 text-primary">{title}</h1>
+                <span className={`badge ${getStatusColor(status)} badge-lg text-base mt-2`}>
+                  {getStatusText(status)}
+                </span>
+                <div className="mt-4 bg-base-200 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">任务描述</p>
+                  <p className="mt-1 text-base leading-relaxed">{description}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-4 min-w-[180px] items-end">
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务ID</div>
+                  <div className="font-mono text-lg">#{id.toString()}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">创建时间</div>
+                  <div className="font-semibold">{formatCreatedAt(createdAt)}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">截止时间</div>
+                  <div className="font-semibold">{formatDeadline(deadline)}</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务报酬</div>
+                  <div className="font-semibold">{(Number(totalreward.toString()) / 1e18).toFixed(2)} TST</div>
+                </div>
+                <div className="bg-base-200 rounded-xl p-3 w-full">
+                  <div className="text-xs text-gray-500">任务创建者</div>
+                  <Address address={creator} />
+                </div>
+                {taskWorker && (
+                  <div className="bg-base-200 rounded-xl p-3 w-full">
+                    <div className="text-xs text-gray-500">工作者</div>
+                    <Address address={taskWorker} />
+                  </div>
+                )}
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <p className="text-sm text-gray-500">任务ID</p>
-                <p>#{id.toString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">创建时间</p>
-                <p>{formatCreatedAt(createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">截止时间</p>
-                <p>{formatDeadline(deadline)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">任务报酬</p>
-                <p>{(Number(totalreward.toString()) / 1e18).toFixed(2)} TST</p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">任务描述</p>
-              <p className="mt-1">{description}</p>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">任务创建者</p>
-              <Address address={creator} />
-            </div>
-
-            {taskWorker && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-500">工作者</p>
-                <Address address={taskWorker} />
-              </div>
-            )}
           </div>
         </div>
 
         {/* 根据用户角色和任务状态显示不同内容 */}
         {isTaskCreator ? (
           <>
-            {/* 任务创建者视图 - 如果任务已经有工作者，则不显示竞标者列表链接 */}
-            {!hasWorker && isTaskOpen && (
-              <div className="card bg-base-100 shadow-xl mb-6">
-                <div className="card-body text-center">
-                  <Link href={`/bidding/${taskId}/BidPage`} className="btn btn-primary">
-                    查看竞标者列表
-                  </Link>
+            {/* 操作区：延长截止日期和增加奖励同一行 */}
+            {(isTaskOpen || isTaskInProgress || isTaskCompleted) && (
+              <div className="flex flex-wrap gap-4 mt-2">
+                <div className="flex-1 min-w-[220px]">
+                  <ExtendDeadline taskId={taskId} currentDeadline={deadline} onSuccess={refetchTask} />
+                </div>
+                <div className="flex-1 min-w-[220px]">
+                  <IncreaseReward taskId={taskId} onSuccess={refetchTask} />
                 </div>
               </div>
-            )}
-
-            {/* 只有任务创建者且任务状态为Open或InProgress时才能取消任务 */}
-            <CancelTask taskId={taskId} taskStatus={status} onSuccess={refetchTask} />
-
-            {/* 只有任务创建者且任务状态为Open或InProgress时才能延长截止日期 */}
-            {(isTaskOpen || isTaskInProgress) && (
-              <ExtendDeadline taskId={taskId} currentDeadline={deadline} onSuccess={refetchTask} />
-            )}
-
-            {/* 只有任务创建者且任务状态为Open、InProgress或Completed时才能增加奖励 */}
-            {(isTaskOpen || isTaskInProgress || isTaskCompleted) && (
-              <IncreaseReward taskId={taskId} onSuccess={refetchTask} />
             )}
           </>
         ) : (
           // 工作者视图
           <>
-            <div className="card bg-base-100 shadow-xl mb-6">
-              <div className="card-body">
-                {isTaskOpen ? (
-                  <>
-                    {!showBidForm ? (
-                      <div className="text-center">
-                        <button className="btn btn-primary" onClick={() => setShowBidForm(true)}>
-                          参与竞标
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <h3 className="card-title text-xl mb-4">提交竞标</h3>
-                        <div className="space-y-4">
-                          <div className="form-control">
-                            <label className="label">
-                              <span className="label-text font-bold">竞标金额 (Tokens)</span>
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="竞标金额"
-                              className="input input-bordered w-full"
-                              value={bidAmount}
-                              onChange={e => setBidAmount(e.target.value)}
-                            />
-                          </div>
-                          <div className="form-control">
-                            <label className="label">
-                              <span className="label-text font-bold">竞标描述/提案</span>
-                            </label>
-                            <textarea
-                              placeholder="详细描述您的竞标方案"
-                              className="textarea textarea-bordered w-full"
-                              value={bidDescription}
-                              onChange={e => setBidDescription(e.target.value)}
-                            />
-                          </div>
-                          <div className="form-control">
-                            <label className="label">
-                              <span className="label-text font-bold">预计完成时间 (天)</span>
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="预计完成时间"
-                              className="input input-bordered w-full"
-                              value={estimatedTime}
-                              onChange={e => setEstimatedTime(e.target.value)}
-                            />
-                          </div>
-                          <div className="card-actions justify-end">
-                            <button
-                              className="btn btn-ghost"
-                              onClick={() => {
-                                setShowBidForm(false);
-                                setBidAmount("");
-                                setBidDescription("");
-                                setEstimatedTime("");
-                              }}
-                            >
-                              取消
-                            </button>
-                            <button className="btn btn-primary" onClick={handleSubmitBid}>
-                              提交竞标
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-center text-gray-500">任务已关闭，无法提交竞标</p>
-                )}
-              </div>
-            </div>
-
-            {/* 任务状态为InProgress时显示工作者信息和提交工作量证明按钮 */}
-            {isTaskInProgress && hasWorker && isTaskWorker && (
-              <div className="card bg-base-100 shadow-xl">
+            {isTaskOpen && (
+              <div className="card bg-base-100 shadow-xl mb-6">
                 <div className="card-body">
-                  <div className="flex justify-between items-center">
-                    <h2 className="card-title">任务进行中</h2>
-                    <button className="btn btn-primary" onClick={() => setIsProofModalOpen(true)}>
-                      提交工作量证明
-                    </button>
-                  </div>
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">工作者</span>
-                    </label>
-                    <Address address={taskWorker} />
-                  </div>
+                  <SubmitBid taskId={BigInt(taskId)} isTaskOpen={isTaskOpen} />
                 </div>
               </div>
             )}
@@ -376,66 +259,53 @@ export default function BiddingTaskDetailPage() {
                 }}
               />
             )}
-
-            {/* 只有工作者且任务状态为Completed时才能申领报酬 */}
-            {isTaskWorker && isTaskCompleted && (
-              <div className="card bg-base-100 shadow-xl mt-6">
-                <div className="card-body">
-                  <h2 className="card-title">申领报酬</h2>
-                  <p className="text-sm text-gray-500">您的工作量证明已被批准，现在可以申领您的报酬。</p>
-                  <div className="card-actions justify-end">
-                    <ClaimReward taskId={taskId} onSuccess={refetchTask} />
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
 
         {/* 显示已提交的工作量证明 */}
         {taskProof && taskProof[0] && (
-          <div className="card bg-base-100 shadow-xl mt-6">
-            <div className="card-body">
-              <h2 className="card-title">工作量证明</h2>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">提交时间</span>
-                </label>
-                <p>{new Date(Number(taskProof[3]) * 1000).toLocaleString()}</p>
-              </div>
-              <div className="form-control mt-4">
-                <label className="label">
-                  <span className="label-text">证明内容</span>
-                </label>
-                <div className="p-4 bg-base-200 rounded-lg">
-                  <p>{taskProof[0]}</p>
+          <div className="card bg-base-100 shadow border border-base-300 rounded-2xl">
+            <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h2 className="card-title text-xl font-bold mb-2">工作量证明</h2>
+                <div className="form-control mt-2">
+                  <label className="label">
+                    <span className="label-text">提交时间</span>
+                  </label>
+                  <p className="font-mono">{new Date(Number(taskProof[3]) * 1000).toLocaleString()}</p>
+                </div>
+                <div className="form-control mt-4">
+                  <label className="label">
+                    <span className="label-text">证明内容</span>
+                  </label>
+                  <div className="p-4 bg-base-200 rounded-lg text-base">
+                    <p>{taskProof[0]}</p>
+                  </div>
                 </div>
               </div>
-              <div className="form-control mt-4">
-                <label className="label">
-                  <span className="label-text">状态</span>
-                </label>
-                <p>{taskProof[2] ? "已批准" : "待批准"}</p>
-              </div>
+              <div className="flex flex-col gap-4 justify-center items-end">
+                <div className="form-control mt-4">
+                  <label className="label">
+                    <span className="label-text">状态</span>
+                  </label>
+                  <p className="font-semibold">{taskProof[2] ? "已批准" : "待批准"}</p>
+                </div>
 
-              {/* 只有任务创建者且工作量证明尚未批准时才显示批准按钮 */}
-              {isTaskCreator && !taskProof[2] && isTaskInProgress && hasWorker && (
-                <div className="card-actions justify-end mt-4">
+                {/* 只有任务创建者且工作量证明尚未批准时才显示批准按钮 */}
+                {isTaskCreator && !taskProof[2] && isTaskInProgress && hasWorker && (
                   <ApproveProofOfWork
                     taskId={BigInt(taskId)}
                     taskWorker={taskWorker}
                     isTaskCreator={isTaskCreator}
                     isTaskInProgress={isTaskInProgress}
                   />
-                </div>
-              )}
+                )}
 
-              {/* 只有工作者且工作量证明尚未批准时才显示提出纠纷按钮 */}
-              {isTaskWorker && !taskProof[2] && isTaskInProgress && (
-                <div className="card-actions justify-end mt-4">
+                {/* 只有工作者且工作量证明尚未批准时才显示提出纠纷按钮 */}
+                {isTaskWorker && !taskProof[2] && isTaskInProgress && (
                   <DisputeButton taskId={taskId} onSuccess={refetchTask} />
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}

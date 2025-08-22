@@ -2,7 +2,6 @@ import { useState } from "react";
 import { parseEther } from "viem";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 import { notification } from "~~/utils/scaffold-eth";
 
 interface AddWorkerProps {
@@ -14,7 +13,6 @@ export const AddWorker = ({ taskId, onSuccess }: AddWorkerProps) => {
   const [workerAddress, setWorkerAddress] = useState("");
   const [taskReward, setTaskReward] = useState("");
   const [isAddingWorker, setIsAddingWorker] = useState(false);
-  const writeTxn = useTransactor();
 
   // 获取FixedPaymentTask合约信息
   const { data: fixedPaymentTaskContract } = useDeployedContractInfo({ contractName: "FixedPaymentTask" });
@@ -46,22 +44,16 @@ export const AddWorker = ({ taskId, onSuccess }: AddWorkerProps) => {
       const rewardInWei = parseEther(taskReward);
 
       // 先授权代币
-      await writeTxn(
-        () =>
-          approveToken({
-            functionName: "approve",
-            args: [fixedPaymentTaskContract.address, rewardInWei],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveToken({
+        functionName: "approve",
+        args: [fixedPaymentTaskContract.address, rewardInWei],
+      });
 
       // 然后添加工作者
-      await writeTxn(
-        () =>
-          addWorker({
-            functionName: "addWorker",
-            args: [BigInt(taskId), workerAddress, rewardInWei],
-          }) as Promise<`0x${string}`>,
-      );
+      await addWorker({
+        functionName: "addWorker",
+        args: [BigInt(taskId), workerAddress, rewardInWei],
+      });
 
       // 清空输入框
       setWorkerAddress("");
@@ -79,8 +71,8 @@ export const AddWorker = ({ taskId, onSuccess }: AddWorkerProps) => {
   };
 
   return (
-    <div className="card bg-base-100 shadow-xl">
-      <div className="card-body">
+    <div className="w-full bg-base-100 border border-base-300 rounded-2xl shadow-lg p-4">
+      <div className="card-body p-0">
         <h2 className="card-title">添加工作者</h2>
         <div className="form-control mb-4">
           <label className="label">

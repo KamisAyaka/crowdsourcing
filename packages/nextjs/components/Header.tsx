@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { hardhat } from "viem/chains";
-import { Bars3Icon, BugAntIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick, useTargetNetwork } from "~~/hooks/scaffold-eth";
 
@@ -21,18 +21,6 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/",
   },
   {
-    label: "Fixed Payment",
-    href: "/fixed-payment",
-  },
-  {
-    label: "Bidding",
-    href: "/bidding",
-  },
-  {
-    label: "Milestone",
-    href: "/milestone",
-  },
-  {
     label: "Dispute",
     href: "/dispute",
   },
@@ -41,7 +29,7 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/profile",
   },
   {
-    label: "Debug Contracts",
+    label: "Debug",
     href: "/debug",
     icon: <BugAntIcon className="h-4 w-4" />,
   },
@@ -77,13 +65,22 @@ export const HeaderMenuLinks = () => {
  * Site header
  */
 export const Header = () => {
+  const [searchAddress, setSearchAddress] = useState("");
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
+  const pathname = usePathname();
 
   const burgerMenuRef = useRef<HTMLDetailsElement>(null);
   useOutsideClick(burgerMenuRef, () => {
     burgerMenuRef?.current?.removeAttribute("open");
   });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchAddress.trim()) {
+      window.location.href = `/user/${searchAddress}`;
+    }
+  };
 
   return (
     <div className="sticky lg:static top-0 navbar bg-base-100 min-h-0 shrink-0 justify-between z-20 shadow-md shadow-secondary px-0 sm:px-2">
@@ -106,15 +103,29 @@ export const Header = () => {
             <Image alt="SE2 logo" className="cursor-pointer" fill src="/logo.svg" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold leading-tight">Scaffold-ETH</span>
-            <span className="text-xs">Ethereum dev stack</span>
+            <span className="font-bold leading-tight">任务众包平台</span>
           </div>
         </Link>
         <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
           <HeaderMenuLinks />
         </ul>
       </div>
-      <div className="navbar-end grow mr-4">
+      <div className="navbar-end grow mr-4 flex items-center gap-2">
+        {/* User search form - only show on non-user pages */}
+        {!pathname.startsWith("/user/") && (
+          <form onSubmit={handleSearch} className="hidden md:flex gap-2 items-center">
+            <input
+              type="text"
+              value={searchAddress}
+              onChange={e => setSearchAddress(e.target.value)}
+              placeholder="搜索用户地址"
+              className="input input-bordered input-sm w-48"
+            />
+            <button type="submit" className="btn btn-primary btn-sm">
+              <MagnifyingGlassIcon className="h-4 w-4" />
+            </button>
+          </form>
+        )}
         <RainbowKitCustomConnectButton />
         {isLocalNetwork && <FaucetButton />}
       </div>

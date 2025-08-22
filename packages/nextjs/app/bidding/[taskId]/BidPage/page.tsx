@@ -7,14 +7,12 @@ import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 export default function BidPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const { address } = useAccount();
   const [bids, setBids] = useState<any[]>([]);
   const [isLoadingBids, setIsLoadingBids] = useState(true);
-  const writeTxn = useTransactor();
   const { writeContractAsync: acceptBid } = useScaffoldWriteContract({ contractName: "BiddingTask" });
   const { writeContractAsync: approveToken } = useScaffoldWriteContract({ contractName: "TaskToken" });
 
@@ -49,22 +47,16 @@ export default function BidPage() {
     try {
       // 先授权代币
       const bidAmount = bids[bidIndex].amount;
-      await writeTxn(
-        () =>
-          approveToken({
-            functionName: "approveTaskContract",
-            args: [biddingTaskContract.address, bidAmount],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveToken({
+        functionName: "approveTaskContract",
+        args: [biddingTaskContract.address, bidAmount],
+      });
 
       // 然后接受竞标
-      await writeTxn(
-        () =>
-          acceptBid({
-            functionName: "acceptBid",
-            args: [BigInt(taskId), BigInt(bidIndex)],
-          }) as Promise<`0x${string}`>,
-      );
+      await acceptBid({
+        functionName: "acceptBid",
+        args: [BigInt(taskId), BigInt(bidIndex)],
+      });
     } catch (e) {
       console.error("Error accepting bid:", e);
     }

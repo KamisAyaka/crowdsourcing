@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { formatUnits } from "viem";
-import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 
 interface Task {
+  id?: bigint;
   creator: string;
   title: string;
   description: string;
@@ -15,42 +14,41 @@ interface Task {
 
 interface TaskInfoCardProps {
   task: Task;
-  isTaskCreator: boolean;
-  isTaskWorker: boolean;
-  taskWorker: string | undefined;
+  taskWorker?: string;
 }
 
-export const TaskInfoCard = ({ task, isTaskCreator, isTaskWorker, taskWorker }: TaskInfoCardProps) => {
-  const { address: connectedAddress } = useAccount();
-  const [timeLeft, setTimeLeft] = useState("");
+export const TaskInfoCard = ({ task, taskWorker }: TaskInfoCardProps) => {
+  const formatDeadline = (deadline: bigint) => {
+    const date = new Date(Number(deadline) * 1000);
+    return date.toLocaleString();
+  };
 
-  // 获取任务状态文本
+  const formatCreatedAt = (createdAt: bigint) => {
+    const date = new Date(Number(createdAt) * 1000);
+    return date.toLocaleString();
+  };
+
   const getStatusText = (status: number) => {
     switch (status) {
       case 0:
-        return "开放";
+        return "Open";
       case 1:
-        return "进行中";
-      case 2:
-        return "已完成";
+        return "InProgress";
       case 3:
-        return "已取消";
+        return "Paid";
       case 4:
-        return "已支付";
+        return "Cancelled";
       default:
-        return "未知";
+        return "Unknown";
     }
   };
 
-  // 获取任务状态颜色
   const getStatusColor = (status: number) => {
     switch (status) {
       case 0: // Open
         return "badge-success";
       case 1: // InProgress
         return "badge-warning";
-      case 2: // Completed
-        return "badge-info";
       case 3: // Paid
         return "badge-primary";
       case 4: // Cancelled
@@ -60,85 +58,47 @@ export const TaskInfoCard = ({ task, isTaskCreator, isTaskWorker, taskWorker }: 
     }
   };
 
-  // 格式化创建时间
-  const formatCreatedAt = (createdAt: bigint) => {
-    const date = new Date(Number(createdAt) * 1000);
-    return date.toLocaleString();
-  };
-
-  // 计算剩余时间
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = Date.now() / 1000;
-      const deadline = Number(task.deadline);
-      const difference = deadline - now;
-
-      if (difference > 0) {
-        const days = Math.floor(difference / (60 * 60 * 24));
-        const hours = Math.floor((difference % (60 * 60 * 24)) / (60 * 60));
-        const minutes = Math.floor((difference % (60 * 60)) / 60);
-
-        return `${days}天 ${hours}小时 ${minutes}分钟`;
-      }
-      return "已过期";
-    };
-
-    setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, [task.deadline]);
+  const { id, creator, title, description, totalreward, deadline, status, createdAt } = task;
 
   return (
-    <div className="card bg-base-100 shadow-xl mb-6">
+    <div className="card bg-base-100 shadow-2xl border border-base-300 rounded-3xl">
       <div className="card-body">
-        <h2 className="card-title text-2xl">{task.title}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-bold text-lg mb-2">任务详情</h3>
-            <div className="mb-1">
-              <span className="font-semibold">描述:</span> {task.description}
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">创建者:</span>
-              <Address address={task.creator} disableAddressLink />
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">总奖励:</span> {formatUnits(task.totalreward, 18)} TST
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">截止日期:</span> {new Date(Number(task.deadline) * 1000).toLocaleString()}
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">剩余时间:</span> {timeLeft}
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">创建时间:</span> {formatCreatedAt(task.createdAt)}
-            </div>
-            <div className="mb-1">
-              <span className="font-semibold">状态:</span>
-              <span className={`badge ${getStatusColor(task.status)} ml-2`}>{getStatusText(task.status)}</span>
+        <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+          <div className="flex-1">
+            <h1 className="card-title text-3xl font-bold mb-2 text-primary">{title}</h1>
+            <span className={`badge ${getStatusColor(status)} badge-lg text-base mt-2`}>{getStatusText(status)}</span>
+            <div className="mt-4 bg-base-200 rounded-xl p-4">
+              <p className="text-sm text-gray-500 mb-1">任务描述</p>
+              <p className="mt-1 text-base leading-relaxed">{description}</p>
             </div>
           </div>
-          <div>
-            <h3 className="font-bold text-lg mb-2">参与者</h3>
-            <div className="mb-1">
-              <span className="font-semibold">任务创建者:</span>
-              <Address address={task.creator} disableAddressLink />
-              {isTaskCreator && <span className="badge badge-primary ml-2">您</span>}
-            </div>
-            {taskWorker && (
-              <div className="mb-1">
-                <span className="font-semibold">工作者:</span>
-                <Address address={taskWorker} disableAddressLink />
-                {isTaskWorker && <span className="badge badge-primary ml-2">您</span>}
+          <div className="flex flex-col gap-4 min-w-[180px] items-end">
+            {id && (
+              <div className="bg-base-200 rounded-xl p-3 w-full">
+                <div className="text-xs text-gray-500">任务ID</div>
+                <div className="font-mono text-lg">#{id.toString()}</div>
               </div>
             )}
-            {connectedAddress && !isTaskCreator && !isTaskWorker && (
-              <div className="mt-4">
-                <span className="badge badge-ghost">观察者</span>
+            <div className="bg-base-200 rounded-xl p-3 w-full">
+              <div className="text-xs text-gray-500">创建时间</div>
+              <div className="font-semibold">{formatCreatedAt(createdAt)}</div>
+            </div>
+            <div className="bg-base-200 rounded-xl p-3 w-full">
+              <div className="text-xs text-gray-500">截止时间</div>
+              <div className="font-semibold">{formatDeadline(deadline)}</div>
+            </div>
+            <div className="bg-base-200 rounded-xl p-3 w-full">
+              <div className="text-xs text-gray-500">任务报酬</div>
+              <div className="font-semibold">{formatUnits(totalreward, 18)} TST</div>
+            </div>
+            <div className="bg-base-200 rounded-xl p-3 w-full">
+              <div className="text-xs text-gray-500">任务创建者</div>
+              <Address address={creator} />
+            </div>
+            {taskWorker && (
+              <div className="bg-base-200 rounded-xl p-3 w-full">
+                <div className="text-xs text-gray-500">工作者</div>
+                <Address address={taskWorker} />
               </div>
             )}
           </div>

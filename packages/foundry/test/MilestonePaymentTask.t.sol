@@ -562,7 +562,7 @@ contract MilestonePaymentTaskTest is Test {
 
         // 验证任务状态
         (,,,,,, BaseTask.TaskStatus status,) = milestonePaymentTask.tasks(1);
-        assertEq(uint8(status), uint8(BaseTask.TaskStatus.Completed));
+        assertEq(uint8(status), uint8(BaseTask.TaskStatus.Paid));
     }
 
     // 测试完成任务时没有定义里程碑

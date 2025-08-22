@@ -5,7 +5,6 @@ import { parseEther } from "viem";
 import { useAccount } from "wagmi";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 import { notification } from "~~/utils/scaffold-eth";
 
 export const IncreaseReward = ({ taskId, onSuccess }: { taskId: string; onSuccess?: () => void }) => {
@@ -13,7 +12,6 @@ export const IncreaseReward = ({ taskId, onSuccess }: { taskId: string; onSucces
   const [rewardAmount, setRewardAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const writeTxn = useTransactor();
 
   const { data: task } = useScaffoldReadContract({
     contractName: "MilestonePaymentTask",
@@ -69,22 +67,16 @@ export const IncreaseReward = ({ taskId, onSuccess }: { taskId: string; onSucces
       setError("");
 
       // 先授权代币
-      await writeTxn(
-        () =>
-          approveToken({
-            functionName: "approve",
-            args: [milestonePaymentTaskContract.address, rewardInWei],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveToken({
+        functionName: "approve",
+        args: [milestonePaymentTaskContract.address, rewardInWei],
+      });
 
       // 然后增加奖励
-      await writeTxn(
-        () =>
-          increaseReward({
-            functionName: "increaseReward",
-            args: [BigInt(taskId), rewardInWei],
-          }) as Promise<`0x${string}`>,
-      );
+      await increaseReward({
+        functionName: "increaseReward",
+        args: [BigInt(taskId), rewardInWei],
+      });
 
       notification.success("奖励增加成功");
       onSuccess?.();
@@ -131,10 +123,6 @@ export const IncreaseReward = ({ taskId, onSuccess }: { taskId: string; onSucces
               onChange={e => setRewardAmount(e.target.value)}
               required
             />
-            <div className="text-xs text-gray-500 mt-1">
-              当前余额: {userTokenBalance !== undefined ? (Number(userTokenBalance) / 1e18).toFixed(2) : "加载中..."}{" "}
-              TST
-            </div>
           </div>
 
           {error && <div className="text-error text-sm mt-2">{error}</div>}

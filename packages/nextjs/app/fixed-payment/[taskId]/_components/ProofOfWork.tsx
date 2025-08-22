@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface ProofOfWorkProps {
   taskId: string;
@@ -15,7 +14,6 @@ export const ProofOfWork = ({ taskId, taskDeadline, isOpen, onClose, onSuccess }
   const { address: connectedAddress } = useAccount();
   const [proof, setProof] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const writeTxn = useTransactor();
   const { writeContractAsync: submitProofOfWork } = useScaffoldWriteContract({ contractName: "FixedPaymentTask" });
 
   const handleSubmitProof = async (e: React.FormEvent) => {
@@ -36,13 +34,10 @@ export const ProofOfWork = ({ taskId, taskDeadline, isOpen, onClose, onSuccess }
     try {
       setIsSubmitting(true);
 
-      await writeTxn(
-        () =>
-          submitProofOfWork({
-            functionName: "submitProofOfWork",
-            args: [BigInt(taskId), proof],
-          }) as Promise<`0x${string}`>,
-      );
+      await submitProofOfWork({
+        functionName: "submitProofOfWork",
+        args: [BigInt(taskId), proof],
+      });
 
       // 清空输入框
       setProof("");

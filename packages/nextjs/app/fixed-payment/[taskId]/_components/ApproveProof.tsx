@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface ApproveProofProps {
   taskId: string;
@@ -10,20 +9,16 @@ interface ApproveProofProps {
 
 export const ApproveProof = ({ taskId, workerAddress, onSuccess }: ApproveProofProps) => {
   const [isApproving, setIsApproving] = useState(false);
-  const writeTxn = useTransactor();
   const { writeContractAsync: approveProofOfWork } = useScaffoldWriteContract({ contractName: "FixedPaymentTask" });
 
   const handleApproveProof = async () => {
     try {
       setIsApproving(true);
 
-      await writeTxn(
-        () =>
-          approveProofOfWork({
-            functionName: "approveProofOfWork",
-            args: [BigInt(taskId), workerAddress],
-          }) as Promise<`0x${string}`>,
-      );
+      await approveProofOfWork({
+        functionName: "approveProofOfWork",
+        args: [BigInt(taskId), workerAddress],
+      });
 
       if (onSuccess) {
         onSuccess();

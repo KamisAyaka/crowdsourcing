@@ -3,7 +3,6 @@ import { parseEther } from "viem";
 import { AddressInput, InputBase } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface AddWorkerModalProps {
   isOpen: boolean;
@@ -14,7 +13,7 @@ interface AddWorkerModalProps {
 export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps) => {
   const [workerAddress, setWorkerAddress] = useState("");
   const [reward, setReward] = useState("");
-  const writeTxn = useTransactor();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 获取MilestonePaymentTask合约信息
   const { data: milestonePaymentTaskContract } = useDeployedContractInfo({ contractName: "MilestonePaymentTask" });
@@ -42,30 +41,27 @@ export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps)
     }
 
     try {
+      setIsSubmitting(true);
+
       // 先授权代币
-      await writeTxn(
-        () =>
-          approveToken({
-            functionName: "approve",
-            args: [milestonePaymentTaskContract.address, rewardInWei],
-          }) as Promise<`0x${string}`>,
-        { onBlockConfirmation: onClose },
-      );
+      await approveToken({
+        functionName: "approve",
+        args: [milestonePaymentTaskContract.address, rewardInWei],
+      });
 
       // 然后添加工作者
-      await writeTxn(
-        () =>
-          addWorker({
-            functionName: "addWorker",
-            args: [BigInt(taskId), workerAddress as `0x${string}`, rewardInWei],
-          }) as Promise<`0x${string}`>,
-        { onBlockConfirmation: onClose },
-      );
+      await addWorker({
+        functionName: "addWorker",
+        args: [BigInt(taskId), workerAddress as `0x${string}`, rewardInWei],
+      });
 
       setWorkerAddress("");
       setReward("");
+      onClose();
     } catch (e) {
       console.error("Error adding worker:", e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -94,11 +90,15 @@ export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps)
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
             取消
           </button>
-          <button className="btn btn-primary" onClick={handleAddWorker}>
-            确认分配
+          <button
+            className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
+            onClick={handleAddWorker}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "分配中..." : "确认分配"}
           </button>
         </div>
       </div>

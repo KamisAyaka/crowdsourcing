@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 interface SubmitProofModalProps {
   isOpen: boolean;
@@ -11,7 +10,7 @@ interface SubmitProofModalProps {
 
 export const SubmitProofModal = ({ isOpen, onClose, taskId, milestoneIndex }: SubmitProofModalProps) => {
   const [proof, setProof] = useState("");
-  const writeTxn = useTransactor();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { writeContractAsync: submitMilestoneProofOfWork } = useScaffoldWriteContract({
     contractName: "MilestonePaymentTask",
@@ -24,17 +23,17 @@ export const SubmitProofModal = ({ isOpen, onClose, taskId, milestoneIndex }: Su
     }
 
     try {
-      await writeTxn(
-        () =>
-          submitMilestoneProofOfWork({
-            functionName: "submitMilestoneProofOfWork",
-            args: [BigInt(taskId), BigInt(milestoneIndex), proof],
-          }) as Promise<`0x${string}`>,
-        { onBlockConfirmation: onClose },
-      );
+      setIsSubmitting(true);
+      await submitMilestoneProofOfWork({
+        functionName: "submitMilestoneProofOfWork",
+        args: [BigInt(taskId), BigInt(milestoneIndex), proof],
+      });
       setProof("");
+      onClose();
     } catch (e) {
       console.error("Error submitting proof:", e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -60,11 +59,15 @@ export const SubmitProofModal = ({ isOpen, onClose, taskId, milestoneIndex }: Su
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
             取消
           </button>
-          <button className="btn btn-primary" onClick={handleSubmitProof}>
-            提交证明
+          <button
+            className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
+            onClick={handleSubmitProof}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "提交中..." : "提交证明"}
           </button>
         </div>
       </div>

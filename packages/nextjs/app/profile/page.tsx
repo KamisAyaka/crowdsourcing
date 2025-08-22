@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 import { notification } from "~~/utils/scaffold-eth";
 
 const ProfilePage = () => {
@@ -16,7 +15,6 @@ const ProfilePage = () => {
   const [bio, setBio] = useState("");
   const [website, setWebsite] = useState("");
   const [skills, setSkills] = useState("");
-  const writeTxn = useTransactor();
 
   const { data: userProfile } = useScaffoldReadContract({
     contractName: "UserInfo",
@@ -67,13 +65,10 @@ const ProfilePage = () => {
       .filter(skill => skill.length > 0);
 
     try {
-      await writeTxn(
-        () =>
-          registerUser({
-            functionName: "registerUser",
-            args: [name, email, bio, website, skillsArray],
-          }) as Promise<`0x${string}`>,
-      );
+      registerUser({
+        functionName: "registerUser",
+        args: [name, email, bio, website, skillsArray],
+      });
       setIsRegistered(true);
     } catch (error) {
       console.error("注册失败:", error);
@@ -87,13 +82,10 @@ const ProfilePage = () => {
     }
 
     try {
-      await writeTxn(
-        () =>
-          updateUserProfile({
-            functionName: "updateUserProfile",
-            args: [name, email, bio, website],
-          }) as Promise<`0x${string}`>,
-      );
+      updateUserProfile({
+        functionName: "updateUserProfile",
+        args: [name, email, bio, website],
+      });
     } catch (error) {
       console.error("更新个人信息失败:", error);
     }
@@ -106,13 +98,10 @@ const ProfilePage = () => {
       .filter(skill => skill.length > 0);
 
     try {
-      await writeTxn(
-        () =>
-          updateUserSkills({
-            functionName: "updateUserSkills",
-            args: [skillsArray],
-          }) as Promise<`0x${string}`>,
-      );
+      await updateUserSkills({
+        functionName: "updateUserSkills",
+        args: [skillsArray],
+      });
     } catch (error) {
       console.error("更新技能失败:", error);
     }
@@ -121,6 +110,7 @@ const ProfilePage = () => {
   const handleSubmit = async () => {
     if (isRegistered) {
       await handleUpdateProfile();
+      await handleUpdateSkills();
     } else {
       await handleRegister();
     }

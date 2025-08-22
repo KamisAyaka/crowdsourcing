@@ -4,12 +4,10 @@ import { useEffect, useState } from "react";
 import { CreateTaskModal } from "./_components/CreateTaskModal";
 import { TaskCard } from "./_components/TaskCard";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth/useTransactor";
 
 const FixedPaymentTasksPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<number>(0); // 默认只显示Open状态的任务
-  const writeTxn = useTransactor();
 
   // 读取合约信息
   const {
@@ -51,13 +49,10 @@ const FixedPaymentTasksPage = () => {
     }
 
     try {
-      await writeTxn(
-        () =>
-          createTask({
-            functionName: "createTask",
-            args: [title, description, BigInt(Math.floor(Date.now() / 1000) + deadline)],
-          }) as Promise<`0x${string}`>,
-      );
+      await createTask({
+        functionName: "createTask",
+        args: [title, description, BigInt(Math.floor(Date.now() / 1000) + deadline)],
+      });
       // 重新获取任务计数
       refetchTaskCounter();
 
@@ -67,7 +62,7 @@ const FixedPaymentTasksPage = () => {
     }
   };
 
-  // 获取状态筛选选项（移除"全部状态"选项）
+  // 获取状态筛选选项
   const statusOptions = [
     { value: 0, label: "Open" },
     { value: 1, label: "InProgress" },
@@ -119,7 +114,42 @@ const FixedPaymentTasksPage = () => {
         </div>
       </div>
 
-      {/* 任务概览部分，单独分开并放到下面 */}
+      <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl mb-8">
+        <h2 className="text-2xl font-bold mb-6">功能说明</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-base-200 p-6 rounded-xl">
+            <h3 className="font-bold text-lg mb-2">创建任务</h3>
+            <p className="text-sm">
+              任务创建者可以创建一个固定薪酬任务，指定任务标题、描述和截止时间。
+              创建任务时需要预存报酬，工作者可以接受任务。每个固定薪酬任务只能分配给一个工作者， 适合一对一的合作场景。
+            </p>
+          </div>
+          <div className="bg-base-200 p-6 rounded-xl">
+            <h3 className="font-bold text-lg mb-2">工作者流程</h3>
+            <p className="text-sm">
+              工作者可以查看并接受已创建的固定薪酬任务，任务报酬将被锁定在合约中。
+              完成任务后，工作者可以提交工作量证明等待任务创建者验证。
+              创建者验证通过后，工作者可以领取报酬。整个过程由智能合约自动执行，确保交易安全。
+            </p>
+          </div>
+          <div className="bg-base-200 p-6 rounded-xl">
+            <h3 className="font-bold text-lg mb-2">任务验证与支付</h3>
+            <p className="text-sm">
+              任务创建者可以验证工作者提交的工作量证明，验证通过后任务状态将更新为完成状态。
+              工作者随后可以调用支付功能领取报酬，系统会自动扣除平台费用后将剩余报酬转账给工作者。
+            </p>
+          </div>
+          <div className="bg-base-200 p-6 rounded-xl">
+            <h3 className="font-bold text-lg mb-2">纠纷处理</h3>
+            <p className="text-sm">
+              如果任务创建者和工作者之间产生争议，无论是任务创建者对工作量证明不满意还是工作者认为报酬不合理，
+              双方都可以在满足条件后发起纠纷。纠纷将由专门的纠纷解决合约处理，
+              由管理员投票决定资金的最终分配方案，确保交易的公平性。
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl mb-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">任务概览</h2>
@@ -142,26 +172,6 @@ const FixedPaymentTasksPage = () => {
           <div className="bg-base-200 p-4 rounded-xl">
             <p className="text-sm text-gray-500">任务类型</p>
             <p className="text-2xl font-bold">固定薪酬</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 p-6 w-full max-w-6xl">
-        <h2 className="text-2xl font-bold mb-6">功能说明</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-base-200 p-6 rounded-xl">
-            <h3 className="font-bold text-lg mb-2">创建任务</h3>
-            <p className="text-sm">
-              任务创建者可以创建一个固定薪酬任务，指定任务标题、描述、截止时间和报酬。
-              创建任务时需要存入报酬，工作者可以接受任务。
-            </p>
-          </div>
-          <div className="bg-base-200 p-6 rounded-xl">
-            <h3 className="font-bold text-lg mb-2">接受任务</h3>
-            <p className="text-sm">
-              工作者可以接受已创建的固定薪酬任务，任务报酬将被锁定在合约中。
-              完成任务后，工作者可以提交工作量证明等待任务创建者验证。
-            </p>
           </div>
         </div>
       </div>

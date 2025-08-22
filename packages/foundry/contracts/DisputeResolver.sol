@@ -472,6 +472,18 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     }
 
     /**
+     * @notice 获取所有纠纷信息
+     * @return disputesArray 包含所有纠纷信息的数组
+     */
+    function getAllDisputes() external view returns (Dispute[] memory) {
+        Dispute[] memory disputesArray = new Dispute[](disputeCounter);
+        for (uint256 i = 0; i < disputeCounter; i++) {
+            disputesArray[i] = disputes[i];
+        }
+        return disputesArray;
+    }
+
+    /**
      * @notice 获取管理员质押金额
      * @param _admin 管理员地址
      * @return 质押金额

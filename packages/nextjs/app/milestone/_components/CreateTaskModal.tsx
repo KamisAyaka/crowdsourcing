@@ -65,17 +65,17 @@ export const CreateTaskModal = ({ isOpen, onClose, onCreate }: CreateTaskModalPr
               className="input input-bordered w-full"
               value={taskDeadline || ""}
               onChange={e => setTaskDeadline(Number(e.target.value))}
-              required
               min="1"
+              required
             />
           </div>
 
           <div className="modal-action">
-            <button type="button" className="btn" onClick={onClose}>
-              取消
-            </button>
             <button type="submit" className="btn btn-primary">
               创建任务
+            </button>
+            <button type="button" className="btn" onClick={onClose}>
+              取消
             </button>
           </div>
         </form>
