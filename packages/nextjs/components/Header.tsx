@@ -111,9 +111,9 @@ export const Header = () => {
         </ul>
       </div>
       <div className="navbar-end grow mr-4 flex items-center gap-2">
-        {/* User search form - only show on non-user pages */}
+        {/* User search form - show on all pages except user pages */}
         {!pathname.startsWith("/user/") && (
-          <form onSubmit={handleSearch} className="hidden md:flex gap-2 items-center">
+          <form onSubmit={handleSearch} className="flex gap-2 items-center">
             <input
               type="text"
               value={searchAddress}
