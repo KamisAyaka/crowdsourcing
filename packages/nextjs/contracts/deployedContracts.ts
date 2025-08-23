@@ -9028,7 +9028,7 @@ const deployedContracts = {
       deployedOnBlock: 9045028,
     },
     MilestonePaymentTask: {
-      address: "0x3e3f80cd0c5e65816b82dec85babf598d5dbb91c",
+      address: "0x574f5e453972b5ca33759b6dd751f327c06b0e8e",
       abi: [
         {
           type: "constructor",
@@ -10366,7 +10366,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9045922,
+      deployedOnBlock: 9046253,
     },
   },
 } as const;

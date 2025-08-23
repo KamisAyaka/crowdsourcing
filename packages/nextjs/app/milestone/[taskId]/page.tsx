@@ -178,16 +178,21 @@ const MilestoneTaskDetailPage = () => {
       }
 
       // 批准代币
-      await approveToken({
-        functionName: "approveTaskContract",
+      const approveResult = await approveToken({
+        functionName: "approve",
         args: [milestonePaymentTaskContract.address, parseEther(reward)],
       });
 
+      // 等待授权交易确认
+      console.log("Approval transaction result:", approveResult);
+
       // 添加工作者
-      await addWorker({
+      const addWorkerResult = await addWorker({
         functionName: "addWorker",
         args: [BigInt(taskId), workerAddress, parseEther(reward)],
       });
+
+      console.log("Add worker transaction result:", addWorkerResult);
 
       refetchTask();
       setIsAddWorkerModalOpen(false);

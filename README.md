@@ -24,110 +24,134 @@
 graph TD
     A[TaskToken代币合约] --> B[BaseTask基础任务合约]
     C[DisputeResolver纠纷解决合约] --> B
-    B --> D[FixedPaymentTask固定支付任务]
-    B --> E[BiddingTask竞标任务]
-    B --> F[MilestonePaymentTask里程碑支付任务]
+    D[UserInfo用户信息合约] --> B
+    B --> E[FixedPaymentTask固定支付任务]
+    B --> F[BiddingTask竞标任务]
+    B --> G[MilestonePaymentTask里程碑支付任务]
 
     H[任务创建者] -->|创建任务/支付报酬| B
     I[工作者] -->|竞标/提交工作| B
     J[管理员] -->|处理纠纷| C
 
-    B -.-> D
-    B -.-> E
-    B -.-> F
+
 
     style A fill:#FFE4C4,stroke:#333
     style B fill:#98FB98,stroke:#333
     style C fill:#98FB98,stroke:#333
-    style D fill:#87CEEB,stroke:#333
+    style D fill:#98FB98,stroke:#333
     style E fill:#87CEEB,stroke:#333
     style F fill:#87CEEB,stroke:#333
+    style G fill:#87CEEB,stroke:#333
 ```
 
-### 核心合约
+### 核心合约与任务类型
 
-#### 1. BaseTask.sol - 基础任务合约
+本系统核心合约分为基础合约和任务类型合约，协同实现众包任务的完整流程与安全保障：
 
-这是所有任务类型的基类合约，定义了任务的基本结构和通用功能：
+- **BaseTask.sol（基础任务合约）**：所有任务类型的基类，统一任务结构和通用功能，包括任务状态管理、平台费用结算、纠纷机制集成和抽象方法定义。
+- **TaskToken.sol（任务代币合约）**：平台 ERC20 代币，支持铸造、销毁、授权，作为任务奖励支付和管理员质押。
+- **DisputeResolver.sol（纠纷解决合约）**：处理任务纠纷，管理员质押投票，资金托管与分配，保障交易公平。
+- **UserInfo.sol（用户信息合约）**：管理用户基本信息与相应的技能。
 
-- 任务状态管理（开放、进行中、已完成、已支付、已取消）
-- 平台费用管理
-- 纠纷解决机制集成
-- 抽象方法定义（由子合约实现具体逻辑）
+#### 任务类型合约
 
-#### 2. TaskToken.sol - 任务代币合约
+- **FixedPaymentTask.sol（固定支付任务）**：一对一结算，工作者提交工作量证明，任务创建者验证后一次性支付全部报酬。
+- **BiddingTask.sol（竞标任务）**：支持多工作者竞标，任务创建者选择最优报价，工作完成后支付报酬。
+- **MilestonePaymentTask.sol（里程碑支付任务）**：任务分阶段进行，每个里程碑独立描述和报酬，按进度逐步结算。
 
-平台代币合约，基于 ERC20 标准：
+### 主要功能特性
 
-- 支持代币铸造和销毁
-- 支持授权任务合约使用代币
-- 用于任务奖励的支付
+- **任务全流程管理**：任务创建、取消、延期、奖励调整，工作者分配，工作量证明提交与验证，实时状态跟踪。
+- **多样化雇佣机制**：平台自动扣除费用（默认 1%，可调整），支持固定、竞标、里程碑三种方式，资金托管确保安全。
+- **纠纷解决与投票分配**：纠纷提交后资金托管，管理员质押代币参与投票，公平分配资金并奖励评判者。
+- **安全与权限控制**：防重入攻击、合约暂停与恢复、严格角色权限、时间锁防止恶意纠纷。
 
-#### 3. DisputeResolver.sol - 纠纷解决合约
+## 使用流程
 
-处理任务创建者和工作者之间的纠纷：
+### 固定支付任务流程
 
-- 纠纷提交和处理流程
-- 管理员质押和投票机制
-- 资金托管和分配逻辑
+```mermaid
+sequenceDiagram
+    participant C as 任务创建者
+    participant T as FixedPaymentTask合约
+    participant W as 工作者
 
-### 任务类型合约
+    C->>T: 创建任务
+    C->>T: 添加工作者并存入报酬
+    T->>T: 更新任务状态为进行中
+    W->>T: 提交工作量证明
+    C->>T: 验证工作量证明
+    T->>T: 更新任务状态为已完成
+    W->>T: 领取报酬
+    T->>T: 扣除1%平台费用并转账给工作者
+```
 
-#### 1. FixedPaymentTask.sol - 固定支付任务
+### 竞标任务流程
 
-一次性结清的任务类型，适用于一对一结算场景：
+```mermaid
+sequenceDiagram
+    participant C as 任务创建者
+    participant T as BiddingTask合约
+    participant W1 as 工作者1
+    participant W2 as 工作者2
 
-- 任务创建后添加工作者
-- 工作者提交工作量证明
-- 任务创建者验证工作量证明
-- 完成后一次性支付全部报酬
+    C->>T: 创建任务
+    W1->>T: 提交竞标（金额+预计时间）
+    W2->>T: 提交竞标（金额+预计时间）
+    C->>T: 选择最优竞标并接受
+    T->>T: 转移报酬到合约并更新状态
+    W->>T: 完成任务并提交工作量证明
+    C->>T: 验证工作量证明
+    T->>T: 更新任务状态为已完成
+    W->>T: 领取报酬
+    T->>T: 扣除1%平台费用并转账给工作者
+```
 
-#### 2. BiddingTask.sol - 竞标任务
+### 里程碑支付任务流程
 
-支持工作者竞标机制的任务类型：
+```mermaid
+sequenceDiagram
+    participant C as 任务创建者
+    participant T as MilestonePaymentTask合约
+    participant W as 工作者
 
-- 工作者可以提交竞标，包含金额和预计完成时间
-- 任务创建者可以从竞标者中选择最优报价
-- 选定后将报酬转入合约，任务进入进行中状态
-- 工作者完成任务后提交工作量证明
-- 任务创建者验证工作量证明并支付报酬
+    C->>T: 创建任务并定义里程碑
+    C->>T: 添加工作者
+    T->>T: 更新任务状态为进行中
+    W->>T: 完成里程碑并提交工作量证明
+    C->>T: 验证工作量证明
+    T->>T: 更新里程碑状态并支付对应报酬
+    T->>T: 扣除1%平台费用并转账给工作者
+    W->>T: 完成所有里程碑
+    T->>T: 更新任务状态为已完成
+```
 
-#### 3. MilestonePaymentTask.sol - 里程碑支付任务
+### 纠纷处理流程
 
-支持按里程碑支付的任务类型：
+```mermaid
+sequenceDiagram
+    participant P as 当事人
+    participant T as 任务合约
+    participant D as 纠纷解决合约
+    participant A as 管理员
+    participant V as 投票者
 
-- 任务可以分为多个阶段（里程碑）
-- 每个里程碑有独立的描述和报酬
-- 工作者完成每个里程碑后提交工作量证明
-- 任务创建者验证后支付对应里程碑的报酬
-
-## 功能特性
-
-### 1. 任务管理
-
-- 任务创建、编辑、取消
-- 工作者分配和移除
-- 工作量证明提交和验证
-- 任务状态跟踪
-
-### 2. 支付机制
-
-- 平台费用扣除（默认 1%）
-- 多种支付方式支持
-- 资金安全托管
-
-### 3. 纠纷解决
-
-- 工作者和创建者纠纷提交
-- 管理员投票机制
-- 公平的资金分配方案
-
-### 4. 安全特性
-
-- 防重入攻击保护
-- 合约暂停和恢复功能
-- 权限控制（仅任务创建者、工作者等）
-- 时间锁机制（防止过早提交纠纷）
+    P->>T: 提交纠纷
+    T->>D: 转移资金并创建纠纷记录
+    A->>D: 质押1000个代币成为评判者
+    V->>D: 对纠纷进行投票
+    D->>D: 处理投票并计算分配方案
+    alt 方案被接受
+        P->>D: 双方确认分配方案
+        D->>D: 按方案分配资金给各方
+        D->>D: 分配0.5%奖励给评判者
+    else 方案被拒绝
+        P->>D: 任一方拒绝分配方案
+        D->>D: 收取拒绝费用并分配给评判者
+        D->>D: 重新进入投票状态
+        V->>D: 重新投票
+    end
+```
 
 ## 开发环境要求
 
@@ -144,7 +168,7 @@ graph TD
 1. 如果在 CLI 中跳过了依赖安装，请先安装依赖：
 
 ```bash
-cd my-dapp-example
+cd crowdsourcing
 yarn install
 ```
 
@@ -182,92 +206,6 @@ yarn foundry:test
 - 在 `packages/nextjs/app/page.tsx` 中编辑您的前端主页。有关 [路由](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) 和配置 [页面/布局](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) 的指导，请查看 Next.js 文档
 - 在 `packages/foundry/script` 中编辑您的部署脚本
 
-## 使用流程
-
-### 固定支付任务流程
-
-```mermaid
-sequenceDiagram
-    participant C as 任务创建者
-    participant T as FixedPaymentTask合约
-    participant W as 工作者
-
-    C->>T: 创建任务
-    C->>T: 添加工作者并存入报酬
-    T->>T: 更新任务状态为进行中
-    W->>T: 提交工作量证明
-    C->>T: 验证工作量证明
-    T->>T: 更新任务状态为已完成
-    W->>T: 领取报酬
-    T->>T: 扣除平台费用并转账
-```
-
-### 竞标任务流程
-
-```mermaid
-sequenceDiagram
-    participant C as 任务创建者
-    participant T as BiddingTask合约
-    participant W1 as 工作者1
-    participant W2 as 工作者2
-
-    C->>T: 创建任务
-    W1->>T: 提交竞标（金额+预计时间）
-    W2->>T: 提交竞标（金额+预计时间）
-    C->>T: 选择最优竞标并接受
-    T->>T: 转移报酬到合约并更新状态
-    W->>T: 完成任务并提交工作量证明
-    C->>T: 验证工作量证明
-    T->>T: 更新任务状态为已完成
-    W->>T: 领取报酬
-    T->>T: 扣除平台费用并转账
-```
-
-### 里程碑支付任务流程
-
-```mermaid
-sequenceDiagram
-    participant C as 任务创建者
-    participant T as MilestonePaymentTask合约
-    participant W as 工作者
-
-    C->>T: 创建任务并定义里程碑
-    C->>T: 添加工作者
-    T->>T: 更新任务状态为进行中
-    W->>T: 完成里程碑并提交工作量证明
-    C->>T: 验证工作量证明
-    T->>T: 更新里程碑状态并支付对应报酬
-    W->>T: 完成所有里程碑
-    T->>T: 更新任务状态为已完成
-```
-
-### 纠纷处理流程
-
-```mermaid
-sequenceDiagram
-    participant P as 当事人
-    participant T as 任务合约
-    participant D as 纠纷解决合约
-    participant A as 管理员
-    participant V as 投票者
-
-    P->>T: 提交纠纷
-    T->>D: 转移资金并创建纠纷记录
-    A->>D: 质押代币成为评判者
-    V->>D: 对纠纷进行投票
-    D->>D: 处理投票并计算分配方案
-    alt 方案被接受
-        P->>D: 双方确认分配方案
-        D->>D: 按方案分配资金给各方
-        D->>D: 分配奖励给评判者
-    else 方案被拒绝
-        P->>D: 任一方拒绝分配方案
-        D->>D: 收取拒绝费用并分配给评判者
-        D->>D: 重新进入投票状态
-        V->>D: 重新投票
-    end
-```
-
 ## 合约依赖
 
 本系统依赖于 OpenZeppelin 合约库，包括：
@@ -284,16 +222,31 @@ sequenceDiagram
 
 1. 部署 TaskToken 合约
 2. 部署 DisputeResolver 合约
-3. 部署具体任务类型合约（如 FixedPaymentTask、BiddingTask、MilestonePaymentTask）
+3. 部署 UserInfo 合约
+4. 部署具体任务类型合约（如 FixedPaymentTask、BiddingTask、MilestonePaymentTask）
 
-## 文档
+## 测试说明
 
-访问我们的[文档](https://docs.scaffoldeth.io)了解如何开始使用 Scaffold-ETH 2 构建应用。
+项目包含全面的测试套件，确保合约功能正确性和安全性：
 
-要了解更多功能，请查看我们的[网站](https://scaffoldeth.io)。
+```
+# 运行所有测试
+yarn foundry:test
 
-## 贡献
+# 运行特定合约测试
+forge test --match-contract FixedPaymentTaskTest
 
-我们欢迎对本项目做出贡献！
+# 运行带详细输出的测试
+forge test -vvv
 
-请查看 [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) 了解更多信息和贡献指南。
+# 生成测试覆盖率报告
+forge coverage
+```
+
+测试文件位于 `packages/foundry/test/` 目录下，每个主要合约都有对应的测试文件：
+
+- `TaskToken.t.sol` - 代币合约测试
+- `DisputeResolver.t.sol` - 纠纷解决合约测试
+- `FixedPaymentTask.t.sol` - 固定支付任务测试
+- `BiddingTask.t.sol` - 竞标任务测试
+- `MilestonePaymentTask.t.sol` - 里程碑支付任务测试
