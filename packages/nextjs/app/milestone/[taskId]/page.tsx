@@ -11,16 +11,28 @@ import { IncreaseReward } from "./_components/IncreaseReward";
 import { MilestonesList } from "./_components/MilestonesList";
 import { SubmitProofModal } from "./_components/SubmitProofModal";
 import { TaskInfoCard } from "./_components/TaskInfoCard";
+import { parseEther } from "viem";
 import { useAccount } from "wagmi";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 const MilestoneTaskDetailPage = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const { address: connectedAddress } = useAccount();
+
   const [isAddWorkerModalOpen, setIsAddWorkerModalOpen] = useState(false);
   const [isAddMilestoneModalOpen, setIsAddMilestoneModalOpen] = useState(false);
   const [isProofModalOpen, setIsProofModalOpen] = useState(false);
   const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState<number | null>(null);
+
+  // 获取MilestonePaymentTask合约信息
+  const { data: milestonePaymentTaskContract } = useDeployedContractInfo({ contractName: "MilestonePaymentTask" });
+
+  // 获取TaskToken合约地址
+  const { data: taskTokenData } = useScaffoldReadContract({
+    contractName: "MilestonePaymentTask",
+    functionName: "taskToken",
+  });
 
   // 获取任务详情
   const {
@@ -57,6 +69,16 @@ const MilestoneTaskDetailPage = () => {
   });
 
   const { writeContractAsync: completeTask } = useScaffoldWriteContract({
+    contractName: "MilestonePaymentTask",
+  });
+
+  const { writeContractAsync: addWorker } = useScaffoldWriteContract({ contractName: "MilestonePaymentTask" });
+  const { writeContractAsync: approveToken } = useScaffoldWriteContract({ contractName: "TaskToken" });
+  const { writeContractAsync: addMilestoneContract } = useScaffoldWriteContract({
+    contractName: "MilestonePaymentTask",
+  });
+
+  const { writeContractAsync: submitMilestoneProofOfWork } = useScaffoldWriteContract({
     contractName: "MilestonePaymentTask",
   });
 
@@ -147,6 +169,69 @@ const MilestoneTaskDetailPage = () => {
     }
   };
 
+  // 处理添加工作者
+  const handleAddWorker = async (workerAddress: string, reward: string) => {
+    try {
+      if (!milestonePaymentTaskContract || !taskTokenData) {
+        alert("合约未部署或地址无效");
+        return;
+      }
+
+      // 批准代币
+      await approveToken({
+        functionName: "approveTaskContract",
+        args: [milestonePaymentTaskContract.address, parseEther(reward)],
+      });
+
+      // 添加工作者
+      await addWorker({
+        functionName: "addWorker",
+        args: [BigInt(taskId), workerAddress, parseEther(reward)],
+      });
+
+      refetchTask();
+      setIsAddWorkerModalOpen(false);
+    } catch (e) {
+      console.error("Error adding worker:", e);
+    }
+  };
+
+  // 处理添加里程碑
+  const handleAddMilestone = async (description: string, reward: string) => {
+    try {
+      await addMilestoneContract({
+        functionName: "addMilestone",
+        args: [BigInt(taskId), description, parseEther(reward)],
+      });
+
+      refetchTask();
+      setIsAddMilestoneModalOpen(false);
+    } catch (e) {
+      console.error("Error adding milestone:", e);
+    }
+  };
+
+  // 处理提交工作量证明
+  const handleSubmitMilestoneProof = async (proof: string) => {
+    try {
+      if (selectedMilestoneIndex === null) {
+        alert("请选择一个里程碑");
+        return;
+      }
+
+      await submitMilestoneProofOfWork({
+        functionName: "submitMilestoneProofOfWork",
+        args: [BigInt(taskId), BigInt(selectedMilestoneIndex), proof],
+      });
+
+      refetchTask();
+      setIsProofModalOpen(false);
+      setSelectedMilestoneIndex(null);
+    } catch (e) {
+      console.error("Error submitting proof:", e);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center pt-10 px-2 min-h-screen bg-gradient-to-br from-base-200 to-base-100">
       <div className="w-full max-w-4xl space-y-8">
@@ -175,7 +260,7 @@ const MilestoneTaskDetailPage = () => {
                   </button>
                 )}
                 {/* 添加里程碑按钮 - 仅当任务状态为InProgress时显示 */}
-                {Number(status) === 1 && (
+                {(Number(status) == 1 || Number(status) == 0) && (
                   <button className="btn btn-primary btn-sm" onClick={handleAddMilestoneClick}>
                     添加里程碑
                   </button>
@@ -221,6 +306,7 @@ const MilestoneTaskDetailPage = () => {
           }}
           taskId={taskId}
           milestoneIndex={selectedMilestoneIndex}
+          onSubmitProof={handleSubmitMilestoneProof}
         />
 
         {/* 操作区：延长截止日期和增加奖励同一行 */}
@@ -235,12 +321,20 @@ const MilestoneTaskDetailPage = () => {
           </div>
         )}
 
-        <AddWorkerModal isOpen={isAddWorkerModalOpen} onClose={() => setIsAddWorkerModalOpen(false)} taskId={taskId} />
+        {/* 添加工作者模态框 */}
+        <AddWorkerModal
+          isOpen={isAddWorkerModalOpen}
+          onClose={() => setIsAddWorkerModalOpen(false)}
+          taskId={taskId}
+          onAddWorker={handleAddWorker}
+        />
 
+        {/* 添加里程碑模态框 */}
         <AddMilestoneModal
           isOpen={isAddMilestoneModalOpen}
           onClose={() => setIsAddMilestoneModalOpen(false)}
           taskId={taskId}
+          onAddMilestone={handleAddMilestone}
         />
       </div>
     </div>

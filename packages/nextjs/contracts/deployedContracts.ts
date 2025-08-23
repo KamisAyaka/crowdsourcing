@@ -3843,7 +3843,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     MilestonePaymentTask: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -5184,7 +5184,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
   },
   11155111: {
@@ -9028,7 +9028,7 @@ const deployedContracts = {
       deployedOnBlock: 9045028,
     },
     MilestonePaymentTask: {
-      address: "0x9521db331d16234ee8944758f1478df1a1a46414",
+      address: "0x3e3f80cd0c5e65816b82dec85babf598d5dbb91c",
       abi: [
         {
           type: "constructor",
@@ -10366,7 +10366,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9045028,
+      deployedOnBlock: 9045922,
     },
   },
 } as const;

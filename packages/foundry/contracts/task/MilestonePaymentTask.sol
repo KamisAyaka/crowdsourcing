@@ -164,7 +164,7 @@ contract MilestonePaymentTask is BaseTask {
         }
 
         taskWorker[_taskId] = _worker;
-        task.totalreward = _reward;
+        task.totalreward += _reward;
 
         taskToken.safeTransferFrom(msg.sender, address(this), _reward);
 

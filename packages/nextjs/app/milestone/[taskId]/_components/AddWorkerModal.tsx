@@ -1,63 +1,40 @@
 import { useState } from "react";
-import { parseEther } from "viem";
 import { AddressInput, InputBase } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 interface AddWorkerModalProps {
   isOpen: boolean;
   onClose: () => void;
   taskId: string;
+  onAddWorker: (workerAddress: string, reward: string) => void;
 }
 
-export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps) => {
+export const AddWorkerModal = ({ isOpen, onClose, onAddWorker }: AddWorkerModalProps) => {
   const [workerAddress, setWorkerAddress] = useState("");
   const [reward, setReward] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 获取MilestonePaymentTask合约信息
-  const { data: milestonePaymentTaskContract } = useDeployedContractInfo({ contractName: "MilestonePaymentTask" });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // 获取TaskToken合约地址
-  const { data: taskTokenData } = useScaffoldReadContract({
-    contractName: "MilestonePaymentTask",
-    functionName: "taskToken",
-  });
-
-  const { writeContractAsync: addWorker } = useScaffoldWriteContract({ contractName: "MilestonePaymentTask" });
-  const { writeContractAsync: approveToken } = useScaffoldWriteContract({ contractName: "TaskToken" });
-
-  const handleAddWorker = async () => {
     if (!workerAddress || !reward) {
       alert("请填写所有字段");
       return;
     }
 
-    const rewardInWei = parseEther(reward);
-
-    if (!milestonePaymentTaskContract || !taskTokenData) {
-      alert("合约未部署或地址无效");
+    // 检查奖励值是否为有效数字
+    const rewardValue = parseFloat(reward);
+    if (isNaN(rewardValue) || rewardValue <= 0) {
+      alert("请输入有效的奖励值");
       return;
     }
 
     try {
       setIsSubmitting(true);
+      onAddWorker(workerAddress, reward);
 
-      // 先授权代币
-      await approveToken({
-        functionName: "approve",
-        args: [milestonePaymentTaskContract.address, rewardInWei],
-      });
-
-      // 然后添加工作者
-      await addWorker({
-        functionName: "addWorker",
-        args: [BigInt(taskId), workerAddress as `0x${string}`, rewardInWei],
-      });
-
+      // 重置表单
       setWorkerAddress("");
       setReward("");
-      onClose();
     } catch (e) {
       console.error("Error adding worker:", e);
     } finally {
@@ -68,13 +45,15 @@ export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-base-100 rounded-lg p-6 w-96 max-w-full">
+    <div className="modal modal-open">
+      <div className="modal-box">
         <h3 className="font-bold text-lg mb-4">分配工作者</h3>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">工作者地址</label>
+        <form onSubmit={handleSubmit}>
+          <div className="form-control mb-4">
+            <label className="label">
+              <span className="label-text font-bold">工作者地址</span>
+            </label>
             <AddressInput
               value={workerAddress}
               onChange={value => setWorkerAddress(value)}
@@ -82,25 +61,29 @@ export const AddWorkerModal = ({ isOpen, onClose, taskId }: AddWorkerModalProps)
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">任务报酬 (TST)</label>
+          <div className="form-control mb-4">
+            <label className="label">
+              <span className="label-text font-bold">任务报酬 (TST)</span>
+            </label>
             <InputBase value={reward} onChange={value => setReward(value)} placeholder="输入任务报酬" />
-            <div className="text-xs text-gray-500 mt-1">输入数字，单位为TST代币</div>
+            <div className="text-xs text-gray-500 mt-1">
+              输入数字，单位为TST代币。例如：输入1表示1个TST代币（即10^18个最小单位）
+            </div>
           </div>
-        </div>
 
-        <div className="flex justify-end space-x-3 mt-6">
-          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
-            取消
-          </button>
-          <button
-            className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
-            onClick={handleAddWorker}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "分配中..." : "确认分配"}
-          </button>
-        </div>
+          <div className="modal-action">
+            <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+              取消
+            </button>
+            <button
+              type="submit"
+              className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "分配中..." : "确认分配"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
