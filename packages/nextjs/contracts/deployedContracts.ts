@@ -1330,11 +1330,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "DisputeResolver_VotesAlreadyProcessed",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "DisputeResolver_ZeroReward",
           inputs: [],
         },
@@ -4589,6 +4584,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "unpaiDMilestonesTotalReward",
+          inputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "unpause",
           inputs: [],
           outputs: [],
@@ -5073,6 +5087,17 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "MilestonePaymentTask_TaskNotAddMileStone",
+          inputs: [
+            {
+              name: "taskId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "error",
           name: "MilestonePaymentTask_TaskNotInProgress",
           inputs: [
             {
@@ -5164,7 +5189,7 @@ const deployedContracts = {
   },
   11155111: {
     TaskToken: {
-      address: "0xcb5a4177dfa522058861f0cfd01539bd86e4bfc9",
+      address: "0x334959b5e061e0a38048dbe7bd97448d2ad0155f",
       abi: [
         {
           type: "constructor",
@@ -5640,10 +5665,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
     DisputeResolver: {
-      address: "0x1ac8449be7f0bbd64ecefcc1a88484c8fc214972",
+      address: "0x7d13d668d69a9d101f7698cc9d8c494a3d34ace4",
       abi: [
         {
           type: "constructor",
@@ -6487,11 +6512,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "DisputeResolver_VotesAlreadyProcessed",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "DisputeResolver_ZeroReward",
           inputs: [],
         },
@@ -6535,10 +6555,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
     UserInfo: {
-      address: "0xaf67fec3a02b9bd14ddcd2a0ae70173fcde7b228",
+      address: "0xf0db4df108a073cd452b8e4ed84244f81632d558",
       abi: [
         {
           type: "function",
@@ -6815,10 +6835,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
     FixedPaymentTask: {
-      address: "0x7c0c348659d7029ea2c36222d91ca110fcc1700d",
+      address: "0xc16ed981bf0c2fabb2a4e02366b728be3159b594",
       abi: [
         {
           type: "constructor",
@@ -7812,10 +7832,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
     BiddingTask: {
-      address: "0xafe49ade26e3a86f0ebfc1962c0268f2630a9a0b",
+      address: "0x996f81699eac0e7472979d8d917dc9ad8791025d",
       abi: [
         {
           type: "constructor",
@@ -9005,10 +9025,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
     MilestonePaymentTask: {
-      address: "0x1cea8b3902e9ca108f673fc7235144b26fd80620",
+      address: "0x9521db331d16234ee8944758f1478df1a1a46414",
       abi: [
         {
           type: "constructor",
@@ -9746,6 +9766,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "unpaiDMilestonesTotalReward",
+          inputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "unpause",
           inputs: [],
           outputs: [],
@@ -10230,6 +10269,17 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "MilestonePaymentTask_TaskNotAddMileStone",
+          inputs: [
+            {
+              name: "taskId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "error",
           name: "MilestonePaymentTask_TaskNotInProgress",
           inputs: [
             {
@@ -10316,7 +10366,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9032135,
+      deployedOnBlock: 9045028,
     },
   },
 } as const;

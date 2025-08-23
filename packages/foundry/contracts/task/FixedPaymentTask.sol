@@ -67,8 +67,6 @@ contract FixedPaymentTask is BaseTask {
         _;
     }
 
-    // 移除 onlyTaskWorkerAddress 修饰符，因为已内联到函数中
-
     /**
      * @notice 构造函数
      * @param _taskToken 平台代币地址
@@ -166,8 +164,9 @@ contract FixedPaymentTask is BaseTask {
             // 资金将在纠纷解决时分配，这里不需要进行补偿
             submitDispute(_taskId, worker, task.creator, task.totalreward, proof.proof);
         } else if (task.totalreward > 0) {
-            taskToken.safeTransfer(task.creator, task.totalreward);
+            uint256 amount = task.totalreward;
             task.totalreward = 0;
+            taskToken.safeTransfer(task.creator, amount);
         }
 
         emit FixedPaymentTask_TaskCancelled(_taskId);
@@ -214,7 +213,6 @@ contract FixedPaymentTask is BaseTask {
         whenNotPaused
         onlyTaskInProgress(_taskId)
     {
-        // 内联 onlyTaskWorkerAddress 修饰符逻辑
         if (taskWorker[_taskId] != _worker) {
             revert FixedPaymentTask_NoWorkerAssigned();
         }

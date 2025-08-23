@@ -245,18 +245,6 @@ contract MilestonePaymentTaskTest is Test {
         milestonePaymentTask.addMilestone(1, "Milestone 1", TOTAL_REWARD + 1);
     }
 
-    // 测试添加里程碑时任务未进行中
-    function testAddMilestoneTaskNotInProgress() public {
-        // 创建任务
-        vm.prank(taskCreator);
-        milestonePaymentTask.createTask("Test Task", "Test Description", block.timestamp + 1 days);
-
-        // 尝试在任务未进行中时添加里程碑应该失败
-        vm.prank(taskCreator);
-        vm.expectRevert(abi.encodeWithSelector(MilestonePaymentTask.MilestonePaymentTask_TaskNotInProgress.selector, 1));
-        milestonePaymentTask.addMilestone(1, "Milestone 1", MILESTONE_REWARD_1);
-    }
-
     // 测试提交里程碑工作量证明
     function testSubmitMilestoneProofOfWork() public {
         // 创建任务

@@ -29,9 +29,13 @@ contract MilestonePaymentTask is BaseTask {
     // 存储任务已完成的里程碑数量
     mapping(uint256 => uint256) public completedMilestonesCount;
 
+    // 存储任务未支付里程碑的总奖励，用于避免循环计算
+    mapping(uint256 => uint256) public unpaiDMilestonesTotalReward;
+
     // 自定义错误
     error MilestonePaymentTask_OnlyWorkerCanSubmitProof();
     error MilestonePaymentTask_TaskNotInProgress(uint256 taskId);
+    error MilestonePaymentTask_TaskNotAddMileStone(uint256 taskId);
     error MilestonePaymentTask_ProofOfWorkEmpty();
     error MilestonePaymentTask_TaskCannotBeCancelled();
     error MilestonePaymentTask_InvalidWorkerAddress();
@@ -178,7 +182,6 @@ contract MilestonePaymentTask is BaseTask {
     function addMilestone(uint256 _taskId, string memory _description, uint256 _reward)
         external
         onlyTaskCreator(_taskId)
-        onlyTaskInProgress(_taskId)
         whenNotPaused
     {
         Task storage task = tasks[_taskId];
@@ -188,16 +191,12 @@ contract MilestonePaymentTask is BaseTask {
             revert RewardMoreThanZero();
         }
 
-        // 检查总奖励是否超过任务总奖励
-        uint256 currentTotalRewards = 0;
-        Milestone[] storage milestones = taskMilestones[_taskId];
-        uint256 length = milestones.length;
-        for (uint256 i = 0; i < length; i++) {
-            // 剔除已经支付过的里程碑
-            if (!milestones[i].paid) {
-                currentTotalRewards += milestones[i].reward;
-            }
+        if (task.status == TaskStatus.Paid || task.status == TaskStatus.Cancelled) {
+            revert MilestonePaymentTask_TaskNotAddMileStone(_taskId);
         }
+
+        // 检查总奖励是否超过任务总奖励
+        uint256 currentTotalRewards = unpaiDMilestonesTotalReward[_taskId];
 
         if (currentTotalRewards + _reward > task.totalreward) {
             revert MilestonePaymentTask_RewardInsufficient();
@@ -213,6 +212,9 @@ contract MilestonePaymentTask is BaseTask {
                 workProof: ProofOfWork("", false, false, 0)
             })
         );
+
+        // 更新未支付里程碑总奖励
+        unpaiDMilestonesTotalReward[_taskId] += _reward;
 
         uint256 milestoneIndex = taskMilestones[_taskId].length - 1;
         emit MilestonePaymentTask_MilestoneAdded(_taskId, milestoneIndex, _description, _reward);
@@ -335,6 +337,9 @@ contract MilestonePaymentTask is BaseTask {
         milestone.paid = true;
         tasks[_taskId].totalreward -= milestone.reward;
 
+        // 更新未支付里程碑总奖励
+        unpaiDMilestonesTotalReward[_taskId] -= milestone.reward;
+
         // 支付给工作者
         address worker = taskWorker[_taskId];
         taskToken.safeTransfer(worker, payment);
@@ -402,14 +407,7 @@ contract MilestonePaymentTask is BaseTask {
         InvalidMilestoneIndex(_taskId, _milestoneIndex)
     {
         Task storage task = tasks[_taskId];
-        Milestone[] storage milestones = taskMilestones[_taskId];
-
-        // 检查是否存在里程碑
-        if (milestones.length == 0) {
-            revert MilestonePaymentTask_NoMilestonesDefined();
-        }
-
-        ProofOfWork storage proof = milestones[_milestoneIndex].workProof;
+        ProofOfWork storage proof = taskMilestones[_taskId][_milestoneIndex].workProof;
 
         // 检查是否已提交工作证明
         if (!proof.submitted) {

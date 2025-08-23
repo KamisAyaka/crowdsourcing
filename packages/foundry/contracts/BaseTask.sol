@@ -208,12 +208,9 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         emit WithdrawPlatformRevenue(owner(), amount);
     }
 
-    function changedeadline(uint256 _taskId, uint256 _deadline) external {
+    function changedeadline(uint256 _taskId, uint256 _deadline) external onlyTaskCreator(_taskId) {
         Task storage task = tasks[_taskId];
 
-        if (task.creator != msg.sender) {
-            revert OnlyTaskCreator(msg.sender, _taskId);
-        }
         if (task.deadline >= _deadline) {
             revert InvalidDeadline();
         }
@@ -222,12 +219,9 @@ abstract contract BaseTask is ReentrancyGuard, Pausable, Ownable {
         emit TaskDeadlineChanged(_taskId, task.deadline);
     }
 
-    function increaseReward(uint256 _taskId, uint256 _reward) external {
+    function increaseReward(uint256 _taskId, uint256 _reward) external onlyTaskCreator(_taskId) {
         Task storage task = tasks[_taskId];
 
-        if (task.creator != msg.sender) {
-            revert OnlyTaskCreator(msg.sender, _taskId);
-        }
         if (_reward == 0) {
             revert RewardMoreThanZero();
         }

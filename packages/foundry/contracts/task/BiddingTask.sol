@@ -187,15 +187,6 @@ contract BiddingTask is BaseTask {
     }
 
     /**
-     * @notice 获取指定任务的所有竞标信息
-     * @param _taskId 任务ID
-     * @return bids 所有竞标信息数组
-     */
-    function getAllBids(uint256 _taskId) external view returns (Bid[] memory bids) {
-        bids = taskBids[_taskId];
-    }
-
-    /**
      * @notice 添加工作者到任务中（在竞标任务中，由接受竞标触发）
      * @param _taskId 任务ID
      * @param _worker 工作者地址
@@ -248,8 +239,9 @@ contract BiddingTask is BaseTask {
             // 资金将在纠纷解决时分配，这里不需要进行补偿
             submitDispute(_taskId, worker, task.creator, task.totalreward, proof.proof);
         } else if (task.totalreward > 0) {
-            taskToken.safeTransfer(task.creator, task.totalreward);
+            uint256 amount = task.totalreward;
             task.totalreward = 0;
+            taskToken.safeTransfer(task.creator, amount);
         }
 
         emit BiddingTask_TaskCancelled(_taskId);
@@ -401,5 +393,14 @@ contract BiddingTask is BaseTask {
             revert BiddingTask_InvalidBidIndex();
         }
         return taskBids[_taskId][_bidIndex];
+    }
+
+    /**
+     * @notice 获取指定任务的所有竞标信息
+     * @param _taskId 任务ID
+     * @return bids 所有竞标信息数组
+     */
+    function getAllBids(uint256 _taskId) external view returns (Bid[] memory bids) {
+        bids = taskBids[_taskId];
     }
 }

@@ -94,7 +94,6 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
     error DisputeResolver_AlreadyStaked();
     error DisputeResolver_NotAdmin();
     error DisputeResolver_AlreadyVoted();
-    error DisputeResolver_VotesAlreadyProcessed();
     error DisputeResolver_NotEnoughVotes();
     error DisputeResolver_InvalidTaskToken();
 
@@ -277,11 +276,6 @@ contract DisputeResolver is ReentrancyGuard, Ownable {
         // 检查纠纷状态
         if (dispute.status != DisputeStatus.Filed) {
             revert DisputeResolver_DisputeNotResolved();
-        }
-
-        // 检查是否已经处理过
-        if (dispute.status == DisputeStatus.Resolved) {
-            revert DisputeResolver_VotesAlreadyProcessed();
         }
 
         uint256 length = dispute.votes.length;
