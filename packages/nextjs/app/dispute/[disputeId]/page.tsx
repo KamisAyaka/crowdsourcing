@@ -7,7 +7,7 @@ import { AdminVoting } from "./_components/AdminVoting";
 import { DisputeInfo } from "./_components/DisputeInfo";
 import { DistributionProposal } from "./_components/DistributionProposal";
 import { useAccount } from "wagmi";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
 
 export default function DisputeDetailPage() {
@@ -26,6 +26,16 @@ export default function DisputeDetailPage() {
   const { writeContractAsync: approveProposal } = useScaffoldWriteContract({ contractName: "DisputeResolver" });
   const { writeContractAsync: distributeFunds } = useScaffoldWriteContract({ contractName: "DisputeResolver" });
   const { writeContractAsync: rejectProposal } = useScaffoldWriteContract({ contractName: "DisputeResolver" });
+  const { writeContractAsync: approveToken } = useScaffoldWriteContract({ contractName: "TaskToken" });
+
+  // 获取DisputeResolver合约信息
+  const { data: disputeResolver } = useDeployedContractInfo({ contractName: "DisputeResolver" });
+
+  // 获取处理费用比例
+  const { data: disputeProcessingRewardBps } = useScaffoldReadContract({
+    contractName: "DisputeResolver",
+    functionName: "disputeProcessingRewardBps",
+  });
 
   // 获取纠纷详情
   const {
@@ -194,6 +204,20 @@ export default function DisputeDetailPage() {
   const handleReject = async () => {
     try {
       setIsRejecting(true);
+
+      // 计算处理费用
+      if (disputeData && disputeProcessingRewardBps) {
+        const processingReward = (disputeData.rewardAmount * disputeProcessingRewardBps) / 10000n;
+
+        if (processingReward > 0n) {
+          // 先授权合约可以转移处理费用
+          await approveToken({
+            functionName: "approve",
+            args: [disputeResolver?.address, processingReward],
+          });
+        }
+      }
+
       await rejectProposal({
         functionName: "rejectProposal",
         args: [BigInt(disputeId || 0)],

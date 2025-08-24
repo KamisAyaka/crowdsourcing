@@ -1,0 +1,8 @@
+{
+  "sepolia": {
+    "DisputeResolver": {
+      "address": "0x7d13D668D69a9d101f7698CC9D8C494A3d34ACE4",
+      "startBlock": 9045028
+    }
+  }
+}

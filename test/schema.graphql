@@ -1,0 +1,94 @@
+type DisputeResolver_AdminStaked @entity(immutable: true) {
+  id: Bytes!
+  admin: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_AdminVoted @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  admin: Bytes! # address
+  workerShare: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_AdminWithdrawn @entity(immutable: true) {
+  id: Bytes!
+  admin: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_DisputeFiled @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  taskId: BigInt! # uint256
+  taskContract: Bytes! # address
+  worker: Bytes! # address
+  taskCreator: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_DisputeResolved @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  workerShare: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_FundsDistributed @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  worker: Bytes! # address
+  workerShare: BigInt! # uint256
+  taskCreator: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_ProposalApprovedByCreator @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  taskCreator: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_ProposalApprovedByWorker @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  worker: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DisputeResolver_ProposalRejected @entity(immutable: true) {
+  id: Bytes!
+  disputeId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

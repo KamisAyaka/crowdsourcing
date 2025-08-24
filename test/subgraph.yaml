@@ -1,0 +1,53 @@
+specVersion: 1.3.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: DisputeResolver
+    network: sepolia
+    source:
+      address: "0x7d13D668D69a9d101f7698CC9D8C494A3d34ACE4"
+      abi: DisputeResolver
+      startBlock: 9045028
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - DisputeResolver_AdminStaked
+        - DisputeResolver_AdminVoted
+        - DisputeResolver_AdminWithdrawn
+        - DisputeResolver_DisputeFiled
+        - DisputeResolver_DisputeResolved
+        - DisputeResolver_FundsDistributed
+        - DisputeResolver_ProposalApprovedByCreator
+        - DisputeResolver_ProposalApprovedByWorker
+        - DisputeResolver_ProposalRejected
+        - OwnershipTransferred
+      abis:
+        - name: DisputeResolver
+          file: ./abis/DisputeResolver.json
+      eventHandlers:
+        - event: DisputeResolver_AdminStaked(indexed address,uint256)
+          handler: handleDisputeResolver_AdminStaked
+        - event: DisputeResolver_AdminVoted(indexed uint256,indexed address,uint256)
+          handler: handleDisputeResolver_AdminVoted
+        - event: DisputeResolver_AdminWithdrawn(indexed address,uint256)
+          handler: handleDisputeResolver_AdminWithdrawn
+        - event: DisputeResolver_DisputeFiled(indexed uint256,indexed uint256,indexed address,address,address)
+          handler: handleDisputeResolver_DisputeFiled
+        - event: DisputeResolver_DisputeResolved(indexed uint256,uint256)
+          handler: handleDisputeResolver_DisputeResolved
+        - event: DisputeResolver_FundsDistributed(indexed uint256,address,uint256,address)
+          handler: handleDisputeResolver_FundsDistributed
+        - event: DisputeResolver_ProposalApprovedByCreator(indexed uint256,address)
+          handler: handleDisputeResolver_ProposalApprovedByCreator
+        - event: DisputeResolver_ProposalApprovedByWorker(indexed uint256,address)
+          handler: handleDisputeResolver_ProposalApprovedByWorker
+        - event: DisputeResolver_ProposalRejected(indexed uint256)
+          handler: handleDisputeResolver_ProposalRejected
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+      file: ./src/dispute-resolver.ts

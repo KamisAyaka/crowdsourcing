@@ -1,0 +1,605 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "_taskToken",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  { "inputs": [], "name": "DisputeResolver_AlreadyApproved", "type": "error" },
+  { "inputs": [], "name": "DisputeResolver_AlreadyStaked", "type": "error" },
+  { "inputs": [], "name": "DisputeResolver_AlreadyVoted", "type": "error" },
+  {
+    "inputs": [],
+    "name": "DisputeResolver_DisputeNotResolved",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "DisputeResolver_InvalidTaskContract",
+    "type": "error"
+  },
+  { "inputs": [], "name": "DisputeResolver_InvalidTaskToken", "type": "error" },
+  {
+    "inputs": [],
+    "name": "DisputeResolver_InvalidWorkerShare",
+    "type": "error"
+  },
+  { "inputs": [], "name": "DisputeResolver_NoActiveDispute", "type": "error" },
+  { "inputs": [], "name": "DisputeResolver_NotAdmin", "type": "error" },
+  { "inputs": [], "name": "DisputeResolver_NotEnoughVotes", "type": "error" },
+  { "inputs": [], "name": "DisputeResolver_OnlyDisputeParty", "type": "error" },
+  {
+    "inputs": [],
+    "name": "DisputeResolver_ProposalNotApproved",
+    "type": "error"
+  },
+  { "inputs": [], "name": "DisputeResolver_ZeroReward", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "owner", "type": "address" }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  { "inputs": [], "name": "ReentrancyGuardReentrantCall", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "token", "type": "address" }
+    ],
+    "name": "SafeERC20FailedOperation",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "DisputeResolver_AdminStaked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "workerShare",
+        "type": "uint256"
+      }
+    ],
+    "name": "DisputeResolver_AdminVoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "DisputeResolver_AdminWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "taskId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "taskContract",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "worker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "taskCreator",
+        "type": "address"
+      }
+    ],
+    "name": "DisputeResolver_DisputeFiled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "workerShare",
+        "type": "uint256"
+      }
+    ],
+    "name": "DisputeResolver_DisputeResolved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "worker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "workerShare",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "taskCreator",
+        "type": "address"
+      }
+    ],
+    "name": "DisputeResolver_FundsDistributed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "taskCreator",
+        "type": "address"
+      }
+    ],
+    "name": "DisputeResolver_ProposalApprovedByCreator",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "worker",
+        "type": "address"
+      }
+    ],
+    "name": "DisputeResolver_ProposalApprovedByWorker",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "disputeId",
+        "type": "uint256"
+      }
+    ],
+    "name": "DisputeResolver_ProposalRejected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DenominatorFee",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "adminStakeAmount",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "adminStakes",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "adminStatus",
+    "outputs": [
+      {
+        "internalType": "enum DisputeResolver.AdminStatus",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" }
+    ],
+    "name": "approveProposal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "disputeCounter",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "disputeProcessingRewardBps",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "disputes",
+    "outputs": [
+      { "internalType": "uint256", "name": "taskId", "type": "uint256" },
+      { "internalType": "uint256", "name": "rewardAmount", "type": "uint256" },
+      {
+        "internalType": "enum DisputeResolver.DisputeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      { "internalType": "uint256", "name": "filedAt", "type": "uint256" },
+      { "internalType": "uint256", "name": "resolvedAt", "type": "uint256" },
+      { "internalType": "address", "name": "taskContract", "type": "address" },
+      { "internalType": "address", "name": "worker", "type": "address" },
+      { "internalType": "address", "name": "taskCreator", "type": "address" },
+      { "internalType": "string", "name": "proofOfWork", "type": "string" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" }
+    ],
+    "name": "distributeFunds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "distributionProposals",
+    "outputs": [
+      { "internalType": "uint256", "name": "workerShare", "type": "uint256" },
+      { "internalType": "bool", "name": "workerApproved", "type": "bool" },
+      { "internalType": "bool", "name": "creatorApproved", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_taskContract", "type": "address" },
+      { "internalType": "uint256", "name": "_taskId", "type": "uint256" },
+      { "internalType": "address", "name": "_worker", "type": "address" },
+      { "internalType": "address", "name": "_taskCreator", "type": "address" },
+      { "internalType": "uint256", "name": "_rewardAmount", "type": "uint256" },
+      { "internalType": "string", "name": "_proofOfWork", "type": "string" }
+    ],
+    "name": "fileDispute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_admin", "type": "address" }
+    ],
+    "name": "getAdminStake",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllDisputes",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "taskId", "type": "uint256" },
+          {
+            "internalType": "uint256",
+            "name": "rewardAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum DisputeResolver.DisputeStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          { "internalType": "uint256", "name": "filedAt", "type": "uint256" },
+          {
+            "internalType": "uint256",
+            "name": "resolvedAt",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              { "internalType": "address", "name": "admin", "type": "address" },
+              {
+                "internalType": "uint256",
+                "name": "workerShare",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct DisputeResolver.AdminVote[]",
+            "name": "votes",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "address",
+            "name": "taskContract",
+            "type": "address"
+          },
+          { "internalType": "address", "name": "worker", "type": "address" },
+          {
+            "internalType": "address",
+            "name": "taskCreator",
+            "type": "address"
+          },
+          { "internalType": "string", "name": "proofOfWork", "type": "string" }
+        ],
+        "internalType": "struct DisputeResolver.Dispute[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" }
+    ],
+    "name": "getDispute",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "taskId", "type": "uint256" },
+          {
+            "internalType": "uint256",
+            "name": "rewardAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum DisputeResolver.DisputeStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          { "internalType": "uint256", "name": "filedAt", "type": "uint256" },
+          {
+            "internalType": "uint256",
+            "name": "resolvedAt",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              { "internalType": "address", "name": "admin", "type": "address" },
+              {
+                "internalType": "uint256",
+                "name": "workerShare",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct DisputeResolver.AdminVote[]",
+            "name": "votes",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "address",
+            "name": "taskContract",
+            "type": "address"
+          },
+          { "internalType": "address", "name": "worker", "type": "address" },
+          {
+            "internalType": "address",
+            "name": "taskCreator",
+            "type": "address"
+          },
+          { "internalType": "string", "name": "proofOfWork", "type": "string" }
+        ],
+        "internalType": "struct DisputeResolver.Dispute",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "", "type": "address" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "hasVotedOnDispute",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" }
+    ],
+    "name": "processVotes",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" }
+    ],
+    "name": "rejectProposal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stakeToBecomeAdmin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "taskToken",
+    "outputs": [
+      { "internalType": "contract IERC20", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_disputeId", "type": "uint256" },
+      { "internalType": "uint256", "name": "_workerShare", "type": "uint256" }
+    ],
+    "name": "voteOnDispute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawStake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
